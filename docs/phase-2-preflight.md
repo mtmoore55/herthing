@@ -41,19 +41,50 @@ this checklist does not itself authorize flashing.
 - [x] Confirm the archive matches FlashThing's supported metadata subset
 - [x] Identify the known-good reflash path if first boot fails: re-enter burn
   mode and reflash the pinned Mira 1.2.1 archive. This is not a stock restore.
-- [ ] Build a minimal HerThing image from pinned source
-- [ ] Verify the HerThing archive independently
+- [x] Build a voice-free baseline image from pinned source
+- [x] Verify the baseline archive independently
+- [ ] Replace the Mira UI with the minimal HerThing diagnostic UI
+- [ ] Verify the final HerThing diagnostic archive independently
 - [ ] Review the final command/tool screen before authorizing the write
 
 ## Host build readiness
 
 The pinned source checkouts are present under the gitignored `.artifacts/src/`
-directory. The host currently needs deliberate setup before building:
+directory. The build toolchain is pinned in `.mise.toml`:
 
-- Docker 29.7.2 client is installed, but the user cannot access
-  `/var/run/docker.sock` (owned by root group `docker`).
-- `just`, Go, Bun, Cargo, and rustup are not installed.
-- Node 26/npm, zip/unzip, Git, and sufficient disk space are available.
+- Bun 1.4.2
+- Go 1.27.1
+- just 1.58.0
+- Rust 1.98.1
+
+Docker 29.7.2 is installed. The user must be a member of its narrowly scoped
+`docker` group to access `/var/run/docker.sock`. Node 26/npm, zip/unzip, Git,
+and sufficient disk space are already available.
+
+### Baseline build result
+
+The pinned source successfully produced a voice-free baseline archive on this
+host:
+
+- Filename: `mira_firmware_v1.2.1-herthing-baseline.zip`
+- Size: `391977238` bytes
+- SHA-256:
+  `8d5164a3ce954da81f1b4b45bca18be57d640d6a39d88b77e197d7cc848aebd6`
+- ZIP integrity: verified with `unzip -t`
+- Voice bundle: disabled with `BUNDLE_VOICE=0`
+- Flash metadata: version 2; same full-device operation sequence documented in
+  `docs/upstream/mira-1.2.1.md`
+
+This archive is a build-system proof, not the first-flash candidate. It still
+contains Mira's UI and Spotify-oriented service.
+
+Two host/build compatibility details were required:
+
+1. The privileged build container needs loop device nodes for mounting the
+   stock system image. These were created only inside the disposable container.
+2. Void's rolling repository now supplies `rsync` requiring `ACL_1.3`, while
+   the pinned builder base contains an older ACL runtime. Apply
+   `patches/mira-firmware/0001-refresh-builder-acl.patch` before building.
 
 Do not work around Docker access by running the entire source preparation as
 root. Install the user-space toolchains deliberately and grant narrowly scoped

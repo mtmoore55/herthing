@@ -14,6 +14,11 @@ Foundation research is complete as of 2026-09-18. Nothing has been flashed or
 changed on the Car Thing. Recovery-mode USB enumeration is verified on the
 development host as `1b8e:c003 Amlogic, Inc. GX-CHIP` at USB 2.0 high speed.
 
+The host can now reproduce a voice-free Mira-derived baseline image from pinned
+source. Its archive integrity and manifest have been verified. This is a build
+proof only; it is not the first-flash candidate because it still contains the
+Mira UI and Spotify-oriented service.
+
 The current recommendation is to build a narrow **Mira-derived device image**,
 not a new OS, a Nocturne rebrand, or a stock DeskThing application:
 
@@ -81,3 +86,7 @@ current boot behavior and prepare a tested recovery image/tool path.
 - **2026-09-18:** Downloaded and independently verified the pinned Mira 1.2.1
   recovery archive; audited all flash operations and payload hashes against
   FlashThing 0.6.0. Pinned exact source revisions. No device write performed.
+- **2026-09-18:** Installed a pinned host toolchain, reproduced a voice-free
+  Mira-derived baseline image, fixed and documented a current Void/rsync ACL
+  build incompatibility, and verified the resulting archive and manifest. No
+  device write performed.

@@ -1,0 +1,13 @@
+diff --git a/Dockerfile b/Dockerfile
+index f39e9cc..21d200e 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -3,7 +3,7 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
+ 
+ RUN xbps-install -Suy xbps
+ 
+-RUN xbps-install -uy bash curl dosfstools e2fsprogs findutils util-linux gzip \
++RUN xbps-install -uy acl bash curl dosfstools e2fsprogs findutils util-linux gzip \
+     git m4 mtools pigz tar zstd xz zip mkpasswd zip unzip just rsync \
+     autoconf automake libtool pkg-config make gcc confuse-devel openssl patchelf
+ 
