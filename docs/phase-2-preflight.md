@@ -43,8 +43,9 @@ this checklist does not itself authorize flashing.
   mode and reflash the pinned Mira 1.2.1 archive. This is not a stock restore.
 - [x] Build a voice-free baseline image from pinned source
 - [x] Verify the baseline archive independently
-- [ ] Replace the Mira UI with the minimal HerThing diagnostic UI
-- [ ] Verify the final HerThing diagnostic archive independently
+- [x] Replace the Mira UI with the minimal HerThing diagnostic UI
+- [x] Verify the HerThing diagnostic candidate archive independently
+- [ ] Replace inherited Mira name/description in the candidate manifest
 - [ ] Review the final command/tool screen before authorizing the write
 
 ## Host build readiness
@@ -77,6 +78,21 @@ host:
 
 This archive is a build-system proof, not the first-flash candidate. It still
 contains Mira's UI and Spotify-oriented service.
+
+### Diagnostic candidate result
+
+The first HerThing UI candidate was built with voice bundling disabled:
+
+- Filename: `mira_firmware_v0.1.0-alpha.1.zip`
+- Size: `346134410` bytes
+- SHA-256:
+  `a1d34275ee00697100e13bd9a28c9250219a649e3a44ab63e2d9dc646c4aaaae`
+- ZIP integrity: verified with `unzip -t`
+- Embedded UI: `index.html`, `styles.css`, and `app.js` from `device-ui/`
+- Microphone behavior: explicit OFF presentation; voice bundle disabled
+
+The inherited flash manifest still identifies the image as Mira. Rebrand that
+metadata and rebuild before presenting the final first-flash command.
 
 Two host/build compatibility details were required:
 

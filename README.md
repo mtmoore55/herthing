@@ -14,10 +14,11 @@ Foundation research is complete as of 2026-09-18. Nothing has been flashed or
 changed on the Car Thing. Recovery-mode USB enumeration is verified on the
 development host as `1b8e:c003 Amlogic, Inc. GX-CHIP` at USB 2.0 high speed.
 
-The host can now reproduce a voice-free Mira-derived baseline image from pinned
-source. Its archive integrity and manifest have been verified. This is a build
-proof only; it is not the first-flash candidate because it still contains the
-Mira UI and Spotify-oriented service.
+The host can now reproduce a voice-free Mira-derived image from pinned source
+with the first HerThing diagnostic UI embedded. The candidate archive's
+integrity and manifest have been independently verified. It has not been
+flashed; manifest rebranding and the final command review remain before the
+first device write.
 
 The current recommendation is to build a narrow **Mira-derived device image**,
 not a new OS, a Nocturne rebrand, or a stock DeskThing application:
@@ -90,3 +91,8 @@ current boot behavior and prepare a tested recovery image/tool path.
   Mira-derived baseline image, fixed and documented a current Void/rsync ACL
   build incompatibility, and verified the resulting archive and manifest. No
   device write performed.
+- **2026-09-18:** Added the 800x480 HerThing hardware diagnostic UI, verified
+  its desktop rendering and interaction harness, embedded it in a voice-free
+  firmware candidate, and independently validated the resulting ZIP. Published
+  the project at <https://github.com/mtmoore55/herthing>. No device write
+  performed.
