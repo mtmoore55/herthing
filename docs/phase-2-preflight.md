@@ -145,10 +145,11 @@ latency.
 The kernel exposes `hw:0,0` as `PDM-dummy-alsaPORT-pdm dummy-0`, with one
 capture stream and no idle capture owner. An explicitly authorized foreground
 test captured 5.12 seconds of mono, 16 kHz, signed 32-bit PCM after calling
-`pcm_prepare()` before the first read. The signal was non-silent (`-50.1 dB`
-mean, `-30.4 dB` peak) but quiet enough that gain/conditioning must be evaluated
-for conversational use. The raw sample and temporary probe binaries were
-deleted from device and host immediately after validation.
+`pcm_prepare()` before the first read. The user did not speak during this test,
+so its non-silent signal (`-50.1 dB` mean, `-30.4 dB` peak) proves ambient
+capture but not speech intelligibility. Gain and spoken-audio quality remain a
+Phase 4 test. The raw sample and temporary probe binaries were deleted from
+device and host immediately after validation.
 
 Spotify, Muse, cloud credentials, ambient wake, and dashboard integrations are
 out of scope for the first image.

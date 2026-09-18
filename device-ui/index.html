@@ -3,40 +3,62 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#080a0d" />
+    <meta name="theme-color" content="#090a0d" />
     <title>HerThing</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <section class="hero">
-        <div class="orb" aria-hidden="true"><span></span></div>
-        <div>
-          <p class="eyebrow">HERTHING</p>
-          <h1>Hardware hello.</h1>
-          <p class="subtitle">Turn or press the knob. Try every button.</p>
+    <main class="dashboard" data-view="home">
+      <header>
+        <div class="clock-wrap">
+          <time id="clock">10:42</time>
+          <span id="date">FRI · SEP 18</span>
         </div>
-      </section>
+        <div class="weather" id="weather">
+          <span class="weather-symbol" id="weather-symbol">—</span>
+          <div><strong id="temperature">--°</strong><small id="condition">Weather unavailable</small></div>
+        </div>
+      </header>
 
-      <section class="status-grid" aria-label="Hardware status">
-        <article>
-          <span class="label">LAST INPUT</span>
-          <strong id="last-input">Waiting…</strong>
+      <section class="content">
+        <article class="next-card" data-panel="calendar">
+          <p class="eyebrow">NEXT</p>
+          <div class="empty-state" id="event-empty"><strong>Calendar not connected</strong><span>Add an adapter on the host</span></div>
+          <div class="event-state hidden" id="event-state">
+            <h1 id="event-title"></h1>
+            <div class="event-meta"><span id="event-time"></span><strong id="event-relative"></strong></div>
+            <p id="event-location"></p>
+          </div>
         </article>
-        <article>
-          <span class="label">EVENTS</span>
-          <strong id="event-count">0</strong>
-        </article>
-      </section>
 
-      <section class="event-strip" id="event-strip" aria-live="polite">
-        <span class="empty">No hardware events yet</span>
+        <article class="music-card" data-panel="spotify">
+          <div class="album-art" id="album-art"><span>♪</span></div>
+          <div class="track-copy">
+            <p class="eyebrow">SPOTIFY</p>
+            <div class="empty-state" id="track-empty"><strong>Nothing playing</strong><span>Spotify not connected</span></div>
+            <div class="track-state hidden" id="track-state">
+              <h2 id="track-title"></h2><p id="track-artist"></p>
+              <div class="progress"><i id="track-progress"></i></div>
+              <div class="transport">
+                <button data-command="spotify.previous" aria-label="Previous">‹</button>
+                <button class="play" data-command="spotify.toggle" id="play-button" aria-label="Play or pause">▶</button>
+                <button data-command="spotify.next" aria-label="Next">›</button>
+                <time id="track-time">0:00</time>
+              </div>
+            </div>
+          </div>
+        </article>
       </section>
 
       <footer>
-        <div class="mic off"><i></i><span>MIC OFF</span></div>
-        <div class="build">PHASE 2A · DISPLAY + INPUT</div>
+        <div class="mic off" id="mic-status"><i></i><span id="mic-label">MIC OFF</span></div>
+        <div class="connection offline" id="connection"><i></i><span>HOST OFFLINE</span></div>
       </footer>
+
+      <aside class="toast" id="toast" aria-live="polite"></aside>
+      <aside class="volume" id="volume" aria-hidden="true">
+        <span>VOLUME</span><div><i id="volume-level"></i></div><strong id="volume-value">50</strong>
+      </aside>
     </main>
     <script src="app.js"></script>
   </body>

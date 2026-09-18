@@ -16,5 +16,12 @@ Core microphone states are `off`, `ambient`, and `conversation`. Transient
 activity is represented separately as `idle`, `listening`, `thinking`, or
 `speaking`; this prevents UI activity from obscuring the privacy state.
 
-Schema files and generated TypeScript/Rust types will be added once the hardware
-hello-world establishes the exact event and audio capabilities.
+The canonical Phase 3 envelope and dashboard schema is
+[`herthing-v1.schema.json`](herthing-v1.schema.json). Additive optional fields
+may be introduced within `herthing/1`; removing fields, changing their meaning,
+or changing privacy-state semantics requires a new protocol version.
+
+The host owns dashboard revisions and sends a complete `dashboard_state` after
+every connection. The device owns physical input events. Commands that can
+change external state carry an `idempotency_key`; later approval messages will
+refer to the command `id` rather than exposing provider-specific concepts.

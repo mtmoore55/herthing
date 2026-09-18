@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://herthing.dev/protocol/herthing-v1.schema.json",
+  "title": "HerThing protocol v1",
+  "oneOf": [
+    { "$ref": "#/$defs/hello" },
+    { "$ref": "#/$defs/dashboardState" },
+    { "$ref": "#/$defs/inputEvent" },
+    { "$ref": "#/$defs/command" },
+    { "$ref": "#/$defs/ack" },
+    { "$ref": "#/$defs/error" }
+  ],
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["protocol", "type", "id", "sent_at"],
+      "properties": {
+        "protocol": { "const": "herthing/1" },
+        "type": { "type": "string" },
+        "id": { "type": "string", "minLength": 1 },
+        "sent_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "hello": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "hello" },
+            "role": { "enum": ["device", "host"] },
+            "capabilities": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["role", "capabilities"]
+        }
+      ]
+    },
+    "dashboardState": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "dashboard_state" },
+            "revision": { "type": "integer", "minimum": 0 },
+            "weather": {
+              "type": ["object", "null"],
+              "properties": {
+                "temperature": { "type": "number" },
+                "unit": { "enum": ["F", "C"] },
+                "condition": { "type": "string" },
+                "symbol": { "type": "string" }
+              },
+              "required": ["temperature", "unit", "condition"]
+            },
+            "next_event": {
+              "type": ["object", "null"],
+              "properties": {
+                "title": { "type": "string" },
+                "starts_at": { "type": "string", "format": "date-time" },
+                "location": { "type": ["string", "null"] }
+              },
+              "required": ["title", "starts_at"]
+            },
+            "now_playing": {
+              "type": ["object", "null"],
+              "properties": {
+                "track": { "type": "string" },
+                "artist": { "type": "string" },
+                "album": { "type": ["string", "null"] },
+                "art_url": { "type": ["string", "null"] },
+                "duration_ms": { "type": "integer", "minimum": 0 },
+                "position_ms": { "type": "integer", "minimum": 0 },
+                "playing": { "type": "boolean" }
+              },
+              "required": ["track", "artist", "duration_ms", "position_ms", "playing"]
+            },
+            "microphone": {
+              "type": "object",
+              "properties": {
+                "mode": { "enum": ["off", "ambient", "conversation"] },
+                "activity": { "enum": ["idle", "listening", "thinking", "speaking"] }
+              },
+              "required": ["mode", "activity"]
+            },
+            "transcript": { "type": ["string", "null"] },
+            "assistant_response": { "type": ["string", "null"] }
+          },
+          "required": ["revision", "weather", "next_event", "now_playing", "microphone"]
+        }
+      ]
+    },
+    "inputEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "input_event" },
+            "input": {
+              "enum": ["knob_left", "knob_right", "knob_press", "preset_1", "preset_2", "preset_3", "preset_4", "back", "touch"]
+            },
+            "value": {}
+          },
+          "required": ["input"]
+        }
+      ]
+    },
+    "command": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "command" },
+            "command": { "type": "string", "minLength": 1 },
+            "idempotency_key": { "type": "string", "minLength": 1 },
+            "arguments": { "type": "object" }
+          },
+          "required": ["command", "idempotency_key", "arguments"]
+        }
+      ]
+    },
+    "ack": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "ack" },
+            "reply_to": { "type": "string" }
+          },
+          "required": ["reply_to"]
+        }
+      ]
+    },
+    "error": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "error" },
+            "reply_to": { "type": ["string", "null"] },
+            "code": { "type": "string" },
+            "message": { "type": "string" }
+          },
+          "required": ["code", "message"]
+        }
+      ]
+    }
+  }
+}

@@ -41,6 +41,11 @@ See [docs/research-2026-09-18.md](docs/research-2026-09-18.md) and
 tradeoffs, capability matrix, proposed protocol, privacy model, and Phase 2
 experiment.
 
+Product and interaction decisions are governed by the
+[HerThing Product Principles](docs/product-principles.md): presence over apps,
+conversation over commands, observable privacy, voice-first interaction,
+interruptibility, and latency as a product feature.
+
 First-write preparation is tracked in
 [docs/phase-2-preflight.md](docs/phase-2-preflight.md). The pinned Mira archive
 audit is in [docs/upstream/mira-1.2.1.md](docs/upstream/mira-1.2.1.md).
@@ -110,3 +115,7 @@ current boot behavior and prepare a tested recovery image/tool path.
   `172.16.42.2` (device), confirmed no idle capture owner, and completed an
   explicitly authorized 5.12-second microphone capture from ALSA `hw:0,0`.
   The raw sample and temporary probes were deleted after validation.
+- **2026-09-18:** Started Phase 3 with the `herthing/1` JSON schema, a
+  provider-neutral Bun host service, and the first ambient dashboard. Deployed
+  it as a reversible bind-mounted preview, added a USB-interface-only firewall
+  rule, and verified the physical Chromium client connected over WebSocket.
