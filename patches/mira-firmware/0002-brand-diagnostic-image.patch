@@ -1,0 +1,39 @@
+diff --git a/resources/flash/meta.json b/resources/flash/meta.json
+index eee0e47..92e2143 100644
+--- a/resources/flash/meta.json
++++ b/resources/flash/meta.json
+@@ -1,9 +1,9 @@
+ {
+   "$schema": "https://terbium.app/schema/meta/v1.json",
+   "metadataVersion": 2,
+-  "name": "mira",
++  "name": "HerThing",
+   "version": "@IMAGE_VERSION@",
+-  "description": "Mira firmware for the Spotify Car Thing.",
++  "description": "HerThing diagnostic firmware for the Spotify Car Thing.",
+   "steps": [
+     { "type": "bulkcmd", "value": "amlmmc part 1" },
+     { "type": "log", "value": "rebuilding partition table from device tree (no-op on healthy devices)" },
+diff --git a/scripts/stages/40/30-copy.sh b/scripts/stages/40/30-copy.sh
+index 67d1b02..a7d915f 100644
+--- a/scripts/stages/40/30-copy.sh
++++ b/scripts/stages/40/30-copy.sh
+@@ -30,4 +30,4 @@ cp "$RES_PATH"/kernel/superbird_evt_512.dtb "$IMAGE_PATH"/superbird.dtb
+ } > "$IMAGE_PATH"/boot_hwpart_mira.bin
+ 
+ cd "$IMAGE_PATH"/ || exit 1
+-zip -r9 "$OUTPUT_PATH"/mira_firmware_"$IMAGE_VERSION".zip .
++zip -r9 "$OUTPUT_PATH"/herthing_firmware_"$IMAGE_VERSION".zip .
+diff --git a/scripts/stages/40/40-output.sh b/scripts/stages/40/40-output.sh
+index d923fdb..bb70599 100644
+--- a/scripts/stages/40/40-output.sh
++++ b/scripts/stages/40/40-output.sh
+@@ -5,7 +5,7 @@ color_echo ">> Uncompressed Sizes"
+ color_echo "size of root partition: $SIZE_ROOT_FS ($(du -sh "$ROOTFS_PATH" | sed "s/\s.*//") used)\n" -Yellow
+ 
+ color_echo ">> Compressed Sizes"
+-color_echo "size of install zip: $(du -sh "$OUTPUT_PATH"/mira_firmware_"$IMAGE_VERSION".zip | sed "s/\s.*//")\n" -Yellow
++color_echo "size of install zip: $(du -sh "$OUTPUT_PATH"/herthing_firmware_"$IMAGE_VERSION".zip | sed "s/\s.*//")\n" -Yellow
+ 
+ color_echo "$WORK_PATH" -Yellow
+ echo

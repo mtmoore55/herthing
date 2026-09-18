@@ -45,8 +45,9 @@ this checklist does not itself authorize flashing.
 - [x] Verify the baseline archive independently
 - [x] Replace the Mira UI with the minimal HerThing diagnostic UI
 - [x] Verify the HerThing diagnostic candidate archive independently
-- [ ] Replace inherited Mira name/description in the candidate manifest
-- [ ] Review the final command/tool screen before authorizing the write
+- [x] Replace inherited Mira name/description in the candidate manifest
+- [x] Receive explicit owner authorization for the first device write
+- [ ] Confirm live recovery USB identity and execute the reviewed flash command
 
 ## Host build readiness
 
@@ -81,18 +82,19 @@ contains Mira's UI and Spotify-oriented service.
 
 ### Diagnostic candidate result
 
-The first HerThing UI candidate was built with voice bundling disabled:
+The final HerThing UI candidate was built with voice bundling disabled:
 
-- Filename: `mira_firmware_v0.1.0-alpha.1.zip`
-- Size: `346134410` bytes
+- Filename: `herthing_firmware_v0.1.0-alpha.1.zip`
+- Size: `346137900` bytes
 - SHA-256:
-  `a1d34275ee00697100e13bd9a28c9250219a649e3a44ab63e2d9dc646c4aaaae`
+  `d5d226e3bbca1379c4e7b0fc82eae74fbeaf0f8567afc04911fed3ab8ab5ba4d`
 - ZIP integrity: verified with `unzip -t`
 - Embedded UI: `index.html`, `styles.css`, and `app.js` from `device-ui/`
 - Microphone behavior: explicit OFF presentation; voice bundle disabled
 
-The inherited flash manifest still identifies the image as Mira. Rebrand that
-metadata and rebuild before presenting the final first-flash command.
+The flash manifest identifies the image as HerThing `0.1.0-alpha.1`. Its flash
+operation sequence is unchanged from the previously audited Mira-derived
+candidate.
 
 Two host/build compatibility details were required:
 

@@ -96,3 +96,6 @@ current boot behavior and prepare a tested recovery image/tool path.
   firmware candidate, and independently validated the resulting ZIP. Published
   the project at <https://github.com/mtmoore55/herthing>. No device write
   performed.
+- **2026-09-18:** Rebranded and independently verified the final diagnostic
+  firmware candidate. The owner explicitly authorized the first device write;
+  live recovery-mode identity remains the final stop condition.
