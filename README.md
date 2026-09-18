@@ -105,3 +105,8 @@ current boot behavior and prepare a tested recovery image/tool path.
   HerThing `0.1.0-alpha.1` archive with pinned FlashThing `v0.6.0`, and reached
   the custom `HERTHING — Hardware hello` screen on physical hardware. The
   inherited Mira boot splash remains a known cosmetic limitation.
+- **2026-09-18:** Verified touch, knob rotation/press, presets, and Back on the
+  physical device. Established the USB link at `172.16.42.1/24` (host) and
+  `172.16.42.2` (device), confirmed no idle capture owner, and completed an
+  explicitly authorized 5.12-second microphone capture from ALSA `hw:0,0`.
+  The raw sample and temporary probes were deleted after validation.

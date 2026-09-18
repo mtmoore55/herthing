@@ -137,5 +137,18 @@ power cycle, the physical device reached the custom `HERTHING — Hardware hello
 screen. The inherited Mira boot splash is still visible before the application
 starts and will be rebranded in a later polish pass.
 
+Physical testing confirmed touchscreen, rotary motion, knob press, presets
+1–4, and Back input. The Linux host uses `172.16.42.1/24` on the dedicated USB
+ECM interface and reaches the device at `172.16.42.2` with sub-millisecond ping
+latency.
+
+The kernel exposes `hw:0,0` as `PDM-dummy-alsaPORT-pdm dummy-0`, with one
+capture stream and no idle capture owner. An explicitly authorized foreground
+test captured 5.12 seconds of mono, 16 kHz, signed 32-bit PCM after calling
+`pcm_prepare()` before the first read. The signal was non-silent (`-50.1 dB`
+mean, `-30.4 dB` peak) but quiet enough that gain/conditioning must be evaluated
+for conversational use. The raw sample and temporary probe binaries were
+deleted from device and host immediately after validation.
+
 Spotify, Muse, cloud credentials, ambient wake, and dashboard integrations are
 out of scope for the first image.
