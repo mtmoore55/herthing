@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080a0d" />
+    <title>HerThing</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div class="orb" aria-hidden="true"><span></span></div>
+        <div>
+          <p class="eyebrow">HERTHING</p>
+          <h1>Hardware hello.</h1>
+          <p class="subtitle">Turn or press the knob. Try every button.</p>
+        </div>
+      </section>
+
+      <section class="status-grid" aria-label="Hardware status">
+        <article>
+          <span class="label">LAST INPUT</span>
+          <strong id="last-input">Waiting…</strong>
+        </article>
+        <article>
+          <span class="label">EVENTS</span>
+          <strong id="event-count">0</strong>
+        </article>
+      </section>
+
+      <section class="event-strip" id="event-strip" aria-live="polite">
+        <span class="empty">No hardware events yet</span>
+      </section>
+
+      <footer>
+        <div class="mic off"><i></i><span>MIC OFF</span></div>
+        <div class="build">PHASE 2A · DISPLAY + INPUT</div>
+      </footer>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
