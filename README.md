@@ -10,9 +10,11 @@ are adapters; Muse will be the first personal deployment, not a core dependency.
 
 ## Status
 
-Foundation research is complete as of 2026-09-18. Nothing has been flashed or
-changed on the Car Thing. Recovery-mode USB enumeration is verified on the
-development host as `1b8e:c003 Amlogic, Inc. GX-CHIP` at USB 2.0 high speed.
+Foundation research and the first hardware bring-up are complete as of
+2026-09-18. HerThing `0.1.0-alpha.1` has been flashed to the physical Car Thing
+and boots into the custom diagnostic UI. Recovery-mode USB enumeration is
+verified on the development host as `1b8e:c003 Amlogic, Inc. GX-CHIP` at USB
+2.0 high speed.
 
 The host can now reproduce a voice-free Mira-derived image from pinned source
 with the first HerThing diagnostic UI embedded. The candidate archive's
@@ -99,3 +101,7 @@ current boot behavior and prepare a tested recovery image/tool path.
 - **2026-09-18:** Rebranded and independently verified the final diagnostic
   firmware candidate. The owner explicitly authorized the first device write;
   live recovery-mode identity remains the final stop condition.
+- **2026-09-18:** Verified recovery identity `1b8e:c003`, flashed the checked
+  HerThing `0.1.0-alpha.1` archive with pinned FlashThing `v0.6.0`, and reached
+  the custom `HERTHING — Hardware hello` screen on physical hardware. The
+  inherited Mira boot splash remains a known cosmetic limitation.

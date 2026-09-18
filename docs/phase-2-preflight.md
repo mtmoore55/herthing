@@ -47,7 +47,7 @@ this checklist does not itself authorize flashing.
 - [x] Verify the HerThing diagnostic candidate archive independently
 - [x] Replace inherited Mira name/description in the candidate manifest
 - [x] Receive explicit owner authorization for the first device write
-- [ ] Confirm live recovery USB identity and execute the reviewed flash command
+- [x] Confirm live recovery USB identity and execute the reviewed flash command
 
 ## Host build readiness
 
@@ -128,6 +128,14 @@ The first HerThing image should do only enough to prove the foundation:
 3. Report touch, knob turn/press, preset, and back events.
 4. Expose explicit microphone OFF with no ALSA capture owner.
 5. On user action only, stream a short microphone diagnostic to the host.
+
+## First-flash result
+
+On 2026-09-18, the host confirmed recovery USB identity `1b8e:c003` and
+FlashThing completed every manifest operation with exit code 0. After a normal
+power cycle, the physical device reached the custom `HERTHING — Hardware hello`
+screen. The inherited Mira boot splash is still visible before the application
+starts and will be rebranded in a later polish pass.
 
 Spotify, Muse, cloud credentials, ambient wake, and dashboard integrations are
 out of scope for the first image.
