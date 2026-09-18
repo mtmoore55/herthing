@@ -1,0 +1,13 @@
+# Downloaded firmware and build products are never committed.
+.artifacts/
+dist/
+build/
+
+# Local configuration and credentials.
+.env
+.env.*
+!.env.example
+
+# Editor/OS noise.
+.DS_Store
+*.swp

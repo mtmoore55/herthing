@@ -33,6 +33,10 @@ See [docs/research-2026-09-18.md](docs/research-2026-09-18.md) and
 tradeoffs, capability matrix, proposed protocol, privacy model, and Phase 2
 experiment.
 
+First-write preparation is tracked in
+[docs/phase-2-preflight.md](docs/phase-2-preflight.md). The pinned Mira archive
+audit is in [docs/upstream/mira-1.2.1.md](docs/upstream/mira-1.2.1.md).
+
 ## Host snapshot
 
 - Omarchy 4.0.4 / Arch Linux, x86_64
@@ -74,3 +78,6 @@ current boot behavior and prepare a tested recovery image/tool path.
 - **2026-09-18:** Verified normal boot from the host USB port. The screen reaches
   stock firmware's `Use adapter` power-source warning after a few seconds; as
   expected, stock firmware exposes no normal-mode USB device on this path.
+- **2026-09-18:** Downloaded and independently verified the pinned Mira 1.2.1
+  recovery archive; audited all flash operations and payload hashes against
+  FlashThing 0.6.0. Pinned exact source revisions. No device write performed.

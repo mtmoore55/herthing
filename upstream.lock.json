@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "updated": "2026-09-18",
+  "components": {
+    "mira-release": {
+      "version": "1.2.1",
+      "releaseCommit": "ba48be0",
+      "url": "https://github.com/mira-thing/mira-releases/releases/download/v1.2.1/mira_firmware_v1.2.1.zip",
+      "filename": "mira_firmware_v1.2.1.zip",
+      "size": 505935185,
+      "sha256": "5533424790d50deec4f7a7ffa07620835f58152db7845de4e543cdf524f7d705"
+    },
+    "mira-firmware": {
+      "repository": "https://github.com/mira-thing/mira-firmware.git",
+      "commit": "6582fa6e4183b56f386d0ee0bf5d3c6ddf95bebf"
+    },
+    "mira-voice": {
+      "repository": "https://github.com/mira-thing/mira-voice.git",
+      "commit": "d1423d6a1a041e0e356f2bc708f65abd6a9fb805"
+    },
+    "flashthing": {
+      "version": "0.6.0",
+      "repository": "https://github.com/JoeyEamigh/flashthing.git",
+      "commit": "80146130826532482d703d8f351fb2aede0bf54a"
+    }
+  }
+}
