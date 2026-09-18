@@ -1,3 +1,5 @@
+import { fetchWeather, weatherConfig } from './weather.js'
+
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
 const port = Number(process.env.HERTHING_PORT || 8787)
@@ -58,6 +60,17 @@ function mergeState(patch) {
   }
   revision += 1
   broadcast()
+}
+
+const configuredWeather = weatherConfig()
+async function refreshWeather() {
+  if (!configuredWeather) return
+  try {
+    mergeState({ weather: await fetchWeather(configuredWeather) })
+    console.log('[weather] current conditions refreshed')
+  } catch (error) {
+    console.error('[weather] refresh failed:', error.message || error)
+  }
 }
 
 const server = Bun.serve({
@@ -135,3 +148,9 @@ const server = Bun.serve({
 })
 
 console.log(`HerThing host ${protocol} listening on http://${server.hostname}:${server.port}`)
+if (configuredWeather) {
+  refreshWeather()
+  setInterval(refreshWeather, 10 * 60 * 1000)
+} else {
+  console.log('[weather] disabled; set HERTHING_LATITUDE and HERTHING_LONGITUDE to enable')
+}

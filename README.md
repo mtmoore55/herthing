@@ -16,11 +16,10 @@ and boots into the custom diagnostic UI. Recovery-mode USB enumeration is
 verified on the development host as `1b8e:c003 Amlogic, Inc. GX-CHIP` at USB
 2.0 high speed.
 
-The host can now reproduce a voice-free Mira-derived image from pinned source
-with the first HerThing diagnostic UI embedded. The candidate archive's
-integrity and manifest have been independently verified. It has not been
-flashed; manifest rebranding and the final command review remain before the
-first device write.
+The physical device now runs the Mira-derived HerThing image. Its display,
+touchscreen, knob, knob press, presets, Back button, USB network, and ALSA
+microphone capture path have been exercised. A Phase 3 ambient-dashboard preview
+is connected to the provider-neutral host protocol over USB Ethernet.
 
 The current recommendation is to build a narrow **Mira-derived device image**,
 not a new OS, a Nocturne rebrand, or a stock DeskThing application:
@@ -74,12 +73,6 @@ real shed audio before committing to local-only transcription.
 6. **Ambient** — local wake detection and explicit privacy behavior.
 7. **Polish** — watchdogs, offline behavior, startup, updates, and visual QA.
 
-## Safety gate
-
-Do not run flashing tools or alter the Car Thing until the owner explicitly
-approves Phase 2. Before flashing, record the device's USB identities and
-current boot behavior and prepare a tested recovery image/tool path.
-
 ## Project log
 
 - **2026-09-18:** Researched the current ecosystem; selected a Mira-derived
@@ -119,3 +112,8 @@ current boot behavior and prepare a tested recovery image/tool path.
   provider-neutral Bun host service, and the first ambient dashboard. Deployed
   it as a reversible bind-mounted preview, added a USB-interface-only firewall
   rule, and verified the physical Chromium client connected over WebSocket.
+- **2026-09-18:** Corrected rotary direction from physical testing, added an
+  API-key-free Open-Meteo adapter, and packaged the host gateway as a restartable
+  systemd user service. Enabled it on the development host and verified that the
+  physical Car Thing reconnects automatically. Live weather remains opt-in
+  through explicit location coordinates.

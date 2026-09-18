@@ -4,6 +4,6 @@
   "version": "0.1.0-alpha.1",
   "scripts": {
     "start": "bun run server.js",
-    "check": "bun --check server.js"
+    "check": "node --check server.js && node --check weather.js && bun test"
   }
 }

@@ -7,6 +7,33 @@ It binds only to the dedicated Car Thing USB address by default.
 mise exec -- bun run host/server.js
 ```
 
+For this development checkout, install the user service with:
+
+```bash
+mkdir -p ~/.config/systemd/user ~/.config/herthing
+cp installer/systemd/herthing-host.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now herthing-host.service
+```
+
+The checked-in unit expects the repository at `~/herthing`. Its optional
+environment file is `~/.config/herthing/environment`.
+
+## Weather
+
+Current conditions use Open-Meteo and require no API key. Location is never
+guessed. Add coordinates to `~/.config/herthing/environment`:
+
+```ini
+HERTHING_LATITUDE=45.0000
+HERTHING_LONGITUDE=-122.0000
+HERTHING_WEATHER_UNIT=fahrenheit
+```
+
+Restart with `systemctl --user restart herthing-host.service`. Weather refreshes
+at startup and every ten minutes. Until coordinates are configured, weather is
+shown as unavailable.
+
 Health and current state are available at:
 
 ```bash
