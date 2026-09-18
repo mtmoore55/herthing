@@ -71,3 +71,6 @@ current boot behavior and prepare a tested recovery image/tool path.
 - **2026-09-18:** Renamed the project HerThing; verified Amlogic burn-mode USB;
   audited current Mira, Nocturne, and DeskThing microphone source and licensing;
   recorded the public-project foundation decision. Still no device write.
+- **2026-09-18:** Verified normal boot from the host USB port. The screen reaches
+  stock firmware's `Use adapter` power-source warning after a few seconds; as
+  expected, stock firmware exposes no normal-mode USB device on this path.

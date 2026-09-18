@@ -141,11 +141,14 @@ hardware.
 
 ## Gate before the first flash
 
-The next physical step is non-writing: leave burn mode, boot the Car Thing
-normally, and inventory its current state. Record normal-mode `lsusb`, whether
-ADB or USB networking appears, the screen shown, and any firmware version that
-can be obtained without authentication or alteration. Then prepare and validate
-offline:
+Normal-mode inventory is complete: the unit boots within a few seconds to the
+stock `Use adapter` power-source warning, while `lsusb` and `lsusb -t` show no
+Car Thing function, ADB interface, or USB network gadget. Recovery mode remains
+reliably visible as `1b8e:c003` at USB 2.0 high speed. This is consistent with
+stock firmware checking for its expected power adapter rather than exposing a
+normal host-data interface.
+
+The next step is entirely offline: prepare and validate:
 
 1. A pinned upstream Mira recovery image and SHA-256.
 2. A pinned HerThing bring-up image built without Spotify credentials and,
