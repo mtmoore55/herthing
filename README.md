@@ -130,3 +130,7 @@ real shed audio before committing to local-only transcription.
 - **2026-09-18:** Moved wall-clock timezone ownership to the host so the Car
   Thing's UTC-configured runtime renders the clock and calendar consistently in
   the host's local timezone, including daylight-saving offsets.
+- **2026-09-18:** Replaced the Phase 3 card dashboard with a dependency-free
+  continuous Canvas visual field: calm ambient typography, album-derived
+  generative color, morphing track transitions, composable user/assistant voice
+  energy inputs, and an always-visible three-state privacy indicator.

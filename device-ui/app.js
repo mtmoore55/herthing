@@ -18,7 +18,7 @@
   }
 
   var $ = function (id) { return document.getElementById(id) }
-  var dashboard = document.querySelector('.dashboard')
+  var dashboard = document.querySelector('.world')
   var connection = $('connection')
 
   function messageId() {
@@ -143,22 +143,39 @@
 
   function renderTrack() {
     var track = state.now_playing
+    dashboard.dataset.track = String(!!track)
+    dashboard.dataset.music = String(!!(track && track.playing))
     $('track-empty').classList.toggle('hidden', !!track)
     $('track-state').classList.toggle('hidden', !track)
-    if (!track) { $('album-art').style.backgroundImage = ''; return }
+    if (!track) {
+      $('album-art').removeAttribute('src')
+      if (window.HerThingVisuals) window.HerThingVisuals.setArtwork(null)
+      return
+    }
     $('track-title').textContent = track.track
     $('track-artist').textContent = track.artist
     $('track-time').textContent = formatDuration(track.position_ms)
     $('play-button').textContent = track.playing ? 'Ⅱ' : '▶'
     $('track-progress').style.width = (track.duration_ms ? Math.min(100, track.position_ms / track.duration_ms * 100) : 0) + '%'
-    $('album-art').style.backgroundImage = track.art_url ? 'url("' + track.art_url.replace(/"/g, '') + '")' : ''
+    if (track.art_url && $('album-art').src !== track.art_url) $('album-art').src = track.art_url
+    if (window.HerThingVisuals) window.HerThingVisuals.setArtwork(track.art_url || track.track)
   }
 
   function renderMicrophone() {
     var microphone = state.microphone || { mode: 'off', activity: 'idle' }
     var mode = microphone.mode || 'off'
+    dashboard.dataset.activity = microphone.activity || 'idle'
     $('mic-status').className = 'mic ' + mode + (microphone.activity === 'listening' ? ' listening' : '')
-    $('mic-label').textContent = mode === 'off' ? 'MIC OFF' : microphone.activity === 'listening' ? 'LISTENING' : mode.toUpperCase()
+    $('mic-label').textContent = mode === 'off'
+      ? 'MIC OFF'
+      : microphone.activity === 'listening'
+        ? 'YOU · LISTENING'
+        : microphone.activity === 'speaking'
+          ? 'HERTHING · SPEAKING'
+          : mode.toUpperCase()
+    if (window.HerThingVisuals) {
+      window.HerThingVisuals.setVoice(microphone.activity, microphone.user_energy, microphone.assistant_energy)
+    }
   }
 
   function render() { renderWeather(); renderEvent(); renderTrack(); renderMicrophone() }
@@ -210,5 +227,20 @@
     sendInput('touch', { x: Math.round(event.clientX), y: Math.round(event.clientY) })
   })
 
-  tick(); render(); setInterval(tick, 1000); connect()
+  function enableDemo(mode) {
+    state.weather = { temperature: 71, condition: 'Clear', symbol: 'sun' }
+    state.next_event = { title: 'Design Review', starts_at: new Date(Date.now() + 18 * 60000).toISOString(), location: 'Studio' }
+    state.microphone = { mode: mode === 'off' ? 'off' : 'ambient', activity: 'idle' }
+    if (mode.indexOf('music') >= 0 || mode === 'track') {
+      state.now_playing = { track: 'Everything in Its Right Place', artist: 'Radiohead', album: 'Kid A', art_url: null, duration_ms: 251000, position_ms: 137000, playing: true }
+    }
+    if (mode.indexOf('user') >= 0) state.microphone = { mode: 'conversation', activity: 'listening', user_energy: .72 }
+    if (mode.indexOf('assistant') >= 0) state.microphone = { mode: 'conversation', activity: 'speaking', assistant_energy: .72 }
+    setConnection(true)
+  }
+
+  var demoMode = new URLSearchParams(window.location.search).get('demo')
+  if (demoMode) enableDemo(demoMode)
+  tick(); render(); setInterval(tick, 1000)
+  if (!demoMode) connect()
 })()
