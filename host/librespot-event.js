@@ -1,5 +1,5 @@
-#!/usr/bin/env bun
-import { mkdirSync, readFileSync, renameSync } from 'node:fs'
+#!/usr/bin/node
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 
 const runtimeDirectory = `${process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid()}`}/herthing`
 const statePath = `${runtimeDirectory}/librespot-state.json`
@@ -36,6 +36,6 @@ if (event === 'track_changed') {
 
 if (state.track) {
   mkdirSync(runtimeDirectory, { recursive: true, mode: 0o700 })
-  await Bun.write(temporaryPath, `${JSON.stringify(state)}\n`)
+  writeFileSync(temporaryPath, `${JSON.stringify(state)}\n`, { mode: 0o600 })
   renameSync(temporaryPath, statePath)
 }
