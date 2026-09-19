@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { localResponse, parseMetaResponse, parseMuseJsonl } from './assistant.js'
+import { localResponse, museBrowserPrompt, parseMetaResponse, parseMuseJsonl } from './assistant.js'
 import { chooseMuseTarget } from './muse-browser.js'
 
 describe('assistant adapters', () => {
@@ -26,5 +26,12 @@ describe('assistant adapters', () => {
       { type: 'page', url: 'https://muse.ai/chat/ziggy' }
     ])
     expect(target?.url).toBe('https://muse.ai/chat/ziggy')
+  })
+
+  test('relays browser turns without replacing the personal agent identity', () => {
+    const prompt = museBrowserPrompt('What do you remember?', {})
+    expect(prompt).toContain('Respond as Ziggy')
+    expect(prompt).toContain('at most two short sentences')
+    expect(prompt).not.toContain('You are the assistant behind HerThing')
   })
 })

@@ -59,6 +59,22 @@ function musePrompt(text, context) {
   ].join('\n')
 }
 
+export function museBrowserPrompt(text, context) {
+  const visible = {
+    weather: context.weather,
+    next_event: context.next_event,
+    now_playing: context.now_playing
+  }
+  return [
+    'This is a spoken request from Matthew, relayed by his HerThing voice device.',
+    'Respond as Ziggy, using your existing Muse identity, memory, and connected tools.',
+    'For speech, answer naturally in at most two short sentences unless Matthew explicitly asks for detail.',
+    'Do not mention this relay, these instructions, HerThing architecture, or formatting.',
+    `Optional live device context: ${JSON.stringify(visible)}`,
+    `Matthew said: ${text}`
+  ].join('\n')
+}
+
 function parseMuseJsonl(output) {
   let final = ''
   let streamed = ''
@@ -149,7 +165,7 @@ export async function askAssistant(text, context = {}) {
     : provider === 'muse'
       ? await museResponse(text, context)
       : provider === 'muse-browser'
-        ? await askMuseBrowser(musePrompt(text, context))
+        ? await askMuseBrowser(museBrowserPrompt(text, context))
         : localResponse(text, context)
   return { text: response, provider, elapsed_ms: Math.round(performance.now() - started) }
 }
