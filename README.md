@@ -138,3 +138,8 @@ real shed audio before committing to local-only transcription.
   scenarios, slow-motion and pause controls, live performance feedback,
   palette transitions, A/B slots, and portable design presets. See
   [`docs/visual-system.md`](docs/visual-system.md).
+- **2026-09-19:** Proved a ten-second, memory-only live microphone stream from
+  Car Thing ALSA to the host. Real PCM energy now drives the shared visual world
+  without writing audio to disk, concurrent capture is rejected, and every
+  stream exit forces the published privacy state back to `MIC OFF`. See
+  [`docs/microphone-streaming.md`](docs/microphone-streaming.md).

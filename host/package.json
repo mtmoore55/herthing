@@ -4,7 +4,7 @@
   "version": "0.1.0-alpha.1",
   "scripts": {
     "start": "bun run server.js",
-    "check": "node --check server.js && node --check weather.js && node --check calendar.js && node --check media-player.js && node --check system-volume.js && bun test"
+    "check": "node --check server.js && node --check weather.js && node --check calendar.js && node --check media-player.js && node --check system-volume.js && node --check microphone-audio.js && bun test"
   },
   "dependencies": {
     "ical.js": "2.2.1"

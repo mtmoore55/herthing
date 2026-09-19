@@ -2,11 +2,13 @@ import { fetchWeather, weatherConfig } from './weather.js'
 import { calendarConfig, fetchNextEvent } from './calendar.js'
 import { executeMediaCommand, readNowPlaying } from './media-player.js'
 import { setSystemVolume } from './system-volume.js'
+import { createPcmEnergyAnalyzer } from './microphone-audio.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
 const port = Number(process.env.HERTHING_PORT || 8787)
 const clients = new Set()
+let microphoneStreamActive = false
 
 let revision = 1
 let state = {
@@ -126,6 +128,43 @@ const server = Bun.serve({
         return Response.json(snapshot())
       } catch (error) {
         return Response.json({ error: String(error.message || error) }, { status: 400 })
+      }
+    }
+
+    if (url.pathname === '/api/microphone/stream' && request.method === 'POST') {
+      if (!request.body) return Response.json({ error: 'PCM request body required' }, { status: 400 })
+      if (microphoneStreamActive) return Response.json({ error: 'microphone stream already active' }, { status: 409 })
+      microphoneStreamActive = true
+      const analyzer = createPcmEnergyAnalyzer()
+      const reader = request.body.getReader()
+      let bytes = 0
+      let lastBroadcast = 0
+      let loudestDb = -120
+      let peakEnergy = 0
+      mergeState({ microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 } })
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          bytes += value.byteLength
+          const measurement = analyzer.analyze(value)
+          loudestDb = Math.max(loudestDb, measurement.db)
+          peakEnergy = Math.max(peakEnergy, measurement.energy)
+          const now = performance.now()
+          if (measurement.samples && now - lastBroadcast >= 75) {
+            lastBroadcast = now
+            mergeState({ microphone: {
+              mode: 'conversation',
+              activity: 'listening',
+              user_energy: measurement.energy,
+              input_db: Number(measurement.db.toFixed(1))
+            } })
+          }
+        }
+        return Response.json({ ok: true, bytes, loudest_db: Number(loudestDb.toFixed(1)), peak_energy: Number(peakEnergy.toFixed(3)) })
+      } finally {
+        microphoneStreamActive = false
+        mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0 } })
       }
     }
 
