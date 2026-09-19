@@ -2,7 +2,10 @@
 
 HerThing renders one continuous visual world rather than switching between
 dashboard, music, and voice pages. The DOM is a sparse semantic information
-layer over a dependency-free Canvas 2D field.
+layer over a dependency-free Canvas 2D field. That field is a deliberately
+low-resolution 20×12 grid of flat color facets: broad overlapping influences
+produce stepped linear, radial, and diamond-like structures without blurring or
+enlarging the source artwork.
 
 ## Inputs
 
@@ -18,9 +21,12 @@ layer over a dependency-free Canvas 2D field.
   continuously changes event type scale, spacing, contrast, supporting detail,
   background energy, and how much Conditions and music yield.
 
-Album changes interpolate the current palette toward the new palette. User
-voice energy enters as a warm left-origin force; assistant energy enters as a
-cool right-origin force. Both compose over music.
+Album changes interpolate the current palette and the grid continuously toward
+the new visual world. Grid origins drift at incommensurate rates, while a pair
+of low-frequency pulses changes luminance without creating an obvious loop.
+User voice energy enters as a warm left-origin pressure field; assistant energy
+enters as a cool right-origin field. Both illuminate and recolor existing
+facets, so they compose over music instead of replacing it.
 
 ## Development previews
 

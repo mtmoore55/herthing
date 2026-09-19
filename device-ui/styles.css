@@ -2,7 +2,7 @@
 :root { color-scheme: dark; font-family: HerThing, Arial, sans-serif; background: #0a0a09; color: #f2efe8; font-synthesis: none; }
 * { box-sizing: border-box; } html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; } body { background: #0a0a09; } button { font: inherit; }
 .world { --conditions-opacity:1; --event-opacity:.55; --event-size:28px; --event-shift:0px; --event-detail-opacity:1; --event-kicker-size:10px; --music-opacity:1; isolation: isolate; position: relative; width: 100vw; height: 100vh; overflow: hidden; padding: 26px 30px 20px; background: #0a0a09; }
-#visual-field { position: absolute; z-index: -4; inset: 0; width: 100%; height: 100%; filter: saturate(.9); transform: scale(1.025); }
+#visual-field { position:absolute; z-index:-4; inset:0; width:100%; height:100%; image-rendering:pixelated; filter:saturate(1.08); transform:scale(1.025); }
 .veil { position: absolute; z-index: -3; inset: 0; background: linear-gradient(90deg,rgba(7,7,6,.72),rgba(7,7,6,.14) 55%,rgba(7,7,6,.36)),linear-gradient(0deg,rgba(7,7,6,.74),transparent 45%); transition: opacity 1.8s ease; }
 .grain { position:absolute; z-index:-2; inset:-40%; opacity:.035; pointer-events:none; background-image:repeating-radial-gradient(circle at 19% 28%,transparent 0,rgba(255,255,255,.7) .55px,transparent 1.1px,transparent 4px); transform:rotate(8deg); }
 .topline { display:flex; align-items:flex-start; justify-content:space-between; opacity:var(--conditions-opacity); transform:translateY(calc(var(--event-shift) * -.18)); transition:opacity 1.2s ease,transform 1.8s cubic-bezier(.2,.7,.2,1); } .clock-wrap { display:flex; align-items:baseline; gap:15px; }
@@ -23,7 +23,7 @@
 .transport { display:flex; align-items:center; gap:3px; padding-bottom:1px; opacity:0; transform:translateY(6px); transition:opacity .7s ease,transform .7s ease; }
 .transport button { width:37px; height:36px; border:0; color:rgba(255,255,255,.8); background:transparent; font-size:23px; } .transport button#play-button { font-size:15px; }
 .transport time { width:39px; margin-left:5px; color:rgba(255,255,255,.42); font-size:11px; font-variant-numeric:tabular-nums; }
-.world[data-track="true"] .music { opacity:var(--music-opacity); transform:translateY(0); } .world[data-music="true"] .veil { opacity:.45; } .world[data-music="true"] .album-art,.world[data-music="true"] .transport { opacity:1; transform:translateY(0); }
+.world[data-track="true"] .music { opacity:var(--music-opacity); transform:translateY(0); } .world[data-music="true"] .veil { opacity:.27; } .world[data-music="true"] .album-art,.world[data-music="true"] .transport { opacity:1; transform:translateY(0); }
 footer { position:absolute; left:30px; right:30px; bottom:18px; display:flex; justify-content:space-between; align-items:center; }
 .mic,.connection { display:flex; align-items:center; gap:8px; font-size:10px; font-weight:760; letter-spacing:.16em; } .mic>i { position:relative; width:12px; height:12px; border:1px solid currentColor; border-radius:50%; }
 .mic>i b { position:absolute; inset:3px; border-radius:50%; background:currentColor; } .mic.off { color:#ff745e; } .mic.off>i::after { content:""; position:absolute; left:5px; top:-3px; width:1px; height:16px; background:currentColor; transform:rotate(45deg); }
