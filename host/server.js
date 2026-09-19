@@ -2,8 +2,10 @@ import { fetchWeather, weatherConfig } from './weather.js'
 import { calendarConfig, fetchNextEvent } from './calendar.js'
 import { executeMediaCommand, readNowPlaying } from './media-player.js'
 import { setSystemVolume } from './system-volume.js'
-import { createPcmEnergyAnalyzer } from './microphone-audio.js'
+import { createPcmEnergyAnalyzer, createSpeechEndpointDetector } from './microphone-audio.js'
 import { transcribeS32le } from './stt-whisper.js'
+import { askAssistant, assistantConfig } from './assistant.js'
+import { speak, speechConfig } from './speech.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
@@ -148,13 +150,19 @@ const server = Bun.serve({
       if (microphoneStreamActive) return Response.json({ error: 'microphone stream already active' }, { status: 409 })
       microphoneStreamActive = true
       const analyzer = createPcmEnergyAnalyzer()
+      const endpointDetector = createSpeechEndpointDetector()
       const reader = request.body.getReader()
       let bytes = 0
       let lastBroadcast = 0
       let loudestDb = -120
       let peakEnergy = 0
+      let autoStopRequested = false
       const audioChunks = []
-      mergeState({ microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 }, transcript: null })
+      mergeState({
+        microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 },
+        transcript: null,
+        assistant_response: null
+      })
       try {
         while (true) {
           const { done, value } = await reader.read()
@@ -163,10 +171,17 @@ const server = Bun.serve({
           if (bytes > 16000 * 4 * 60) throw new Error('microphone stream exceeded 60 second safety limit')
           audioChunks.push(value.slice())
           const measurement = analyzer.analyze(value)
+          const endpoint = endpointDetector.update(measurement)
           loudestDb = Math.max(loudestDb, measurement.db)
           peakEnergy = Math.max(peakEnergy, measurement.energy)
           const now = performance.now()
-          if (measurement.samples && now - lastBroadcast >= 75) {
+          if (!autoStopRequested && endpoint.endpoint) {
+            autoStopRequested = true
+            mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
+            console.log(`[vad] speech endpoint after ${Math.round(bytes / (16000 * 4) * 1000)} ms`)
+            controlMicrophone('stop').catch((error) => console.error('[vad] auto-stop failed:', error.message || error))
+          }
+          if (!autoStopRequested && measurement.samples && now - lastBroadcast >= 75) {
             lastBroadcast = now
             mergeState({ microphone: {
               mode: 'conversation',
@@ -177,17 +192,28 @@ const server = Bun.serve({
           }
         }
         let transcription = null
+        let assistant = null
         if (bytes >= 16000 * 4 * 0.4) {
           mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
           try {
             transcription = await transcribeS32le(Buffer.concat(audioChunks.map((chunk) => Buffer.from(chunk))))
             mergeState({ transcript: transcription.text || null })
             console.log(`[stt] ${transcription.elapsed_ms} ms: ${transcription.text}`)
+            if (transcription.text) {
+              assistant = await askAssistant(transcription.text, state)
+              mergeState({
+                assistant_response: assistant.text,
+                microphone: { mode: 'conversation', activity: 'speaking', user_energy: 0, assistant_energy: 0.45 }
+              })
+              console.log(`[assistant:${assistant.provider}] ${assistant.elapsed_ms} ms: ${assistant.text}`)
+              const speech = await speak(assistant.text)
+              console.log(`[tts] first audio ${speech.first_audio_ms ?? 'unknown'} ms; complete ${speech.elapsed_ms} ms${speech.skipped ? ' (disabled)' : ''}`)
+            }
           } catch (error) {
-            console.error('[stt] transcription failed:', error.message || error)
+            console.error('[voice] turn failed:', error.message || error)
           }
         }
-        return Response.json({ ok: true, bytes, loudest_db: Number(loudestDb.toFixed(1)), peak_energy: Number(peakEnergy.toFixed(3)), transcription })
+        return Response.json({ ok: true, bytes, loudest_db: Number(loudestDb.toFixed(1)), peak_energy: Number(peakEnergy.toFixed(3)), transcription, assistant })
       } finally {
         microphoneStreamActive = false
         mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0 } })
@@ -229,7 +255,25 @@ const server = Bun.serve({
           }
         }
         if (message.input === 'knob_press' || message.input === 'preset_4') {
-          const action = message.input === 'knob_press' ? 'toggle' : 'off'
+          let action = 'off'
+          if (message.input === 'knob_press') {
+            if (state.microphone.activity === 'listening') {
+              action = 'stop'
+              mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
+            } else if (!microphoneStreamActive) {
+              action = 'start'
+              mergeState({
+                microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 },
+                transcript: null,
+                assistant_response: null
+              })
+            } else {
+              send(ws, envelope('ack', { reply_to: message.id }))
+              return
+            }
+          } else {
+            mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0 } })
+          }
           controlMicrophone(action).catch((error) => {
             console.error('[microphone] control failed:', error.message || error)
             mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0 } })
@@ -264,6 +308,8 @@ const server = Bun.serve({
 })
 
 console.log(`HerThing host ${protocol} listening on http://${server.hostname}:${server.port}`)
+console.log(`[assistant] provider: ${assistantConfig().provider}`)
+console.log(`[tts] ${speechConfig().enabled ? 'enabled' : 'disabled'}`)
 if (configuredWeather) {
   refreshWeather()
   setInterval(refreshWeather, 10 * 60 * 1000)

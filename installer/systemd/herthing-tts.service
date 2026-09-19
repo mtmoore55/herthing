@@ -1,0 +1,17 @@
+[Unit]
+Description=HerThing persistent Piper speech worker
+Documentation=https://github.com/mtmoore55/herthing
+
+[Service]
+Type=simple
+WorkingDirectory=%h/herthing
+ExecStart=%h/herthing/.artifacts/tts-venv/bin/python %h/herthing/host/tts-worker.py --model %h/herthing/.artifacts/tts/en_US-lessac-medium.onnx
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=default.target

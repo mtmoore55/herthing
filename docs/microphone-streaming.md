@@ -44,9 +44,12 @@ and publish OFF before presenting the state visually.
 `device/microphone/` now contains the small supervised service that owns ALSA
 and the microphone state machine. Its local CGI control surface is reachable
 only over the dedicated device link. Knob press toggles a conversation stream;
-preset 4 provides a global OFF override. Capture uses a chunked upload, and the
-same PCM stream fans out in host memory to energy analysis today and VAD/STT
-next.
+preset 4 provides a global OFF override. The host applies a conservative energy endpoint detector:
+after at least 220 ms of detected speech, 1.2 seconds below the silence
+threshold ends the utterance automatically. A second knob press remains an
+immediate manual endpoint, and silence alone never starts transcription.
+Capture uses a chunked upload, and the same PCM stream fans out in host memory
+to energy analysis, endpointing, and STT.
 
 On the current development image, the service files and capture helper live on
 the writable `/var/local/herthing` partition. A standalone `runsv` process

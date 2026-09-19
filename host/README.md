@@ -92,4 +92,23 @@ device. The development microphone bridge accepts memory-only S32 LE PCM at
 `POST /api/microphone/stream`. Physical knob events ask the device-local
 control service to toggle conversation capture; preset 4 always requests OFF.
 A closed, failed, or disconnected stream publishes OFF from a `finally` block.
-STT and assistant adapters are not connected yet.
+The completed utterance is transcribed locally with whisper.cpp, passed to the
+configured assistant adapter, and spoken through the host's default PipeWire
+sink with Piper. Raw audio and intermediate WAV files are not retained.
+
+The default `local` assistant answers a small set of context-aware questions so
+the entire physical path can be tested without credentials. To use Meta Muse:
+
+```bash
+muse login
+mkdir -p ~/.config/herthing
+printf 'HERTHING_ASSISTANT_PROVIDER=muse\n' >> ~/.config/herthing/environment
+systemctl --user restart herthing-host.service
+```
+
+Muse is an adapter, not a core dependency. Its invocation has shell, web, and
+workspace writes disabled. Prepare the pinned local speech runtime with:
+
+```bash
+./scripts/prepare-piper.sh
+```

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { createPcmEnergyAnalyzer } from './microphone-audio.js'
+import { createPcmEnergyAnalyzer, createSpeechEndpointDetector } from './microphone-audio.js'
 
 function pcm32(values) {
   const bytes = new Uint8Array(values.length * 4)
@@ -27,5 +27,19 @@ describe('PCM microphone energy', () => {
     const analyzer = createPcmEnergyAnalyzer()
     expect(analyzer.analyze(new Uint8Array([1, 0])).samples).toBe(0)
     expect(analyzer.analyze(new Uint8Array([0, 0])).samples).toBe(1)
+  })
+})
+
+describe('speech endpoint detector', () => {
+  test('ends after sustained speech followed by silence', () => {
+    const detector = createSpeechEndpointDetector({ sampleRate: 1000, minimumSpeechMs: 200, trailingSilenceMs: 1000 })
+    expect(detector.update({ db: -55, samples: 200 }).speech_detected).toBe(true)
+    expect(detector.update({ db: -70, samples: 900 }).endpoint).toBe(false)
+    expect(detector.update({ db: -70, samples: 100 }).endpoint).toBe(true)
+  })
+
+  test('does not endpoint ambient silence before speech', () => {
+    const detector = createSpeechEndpointDetector({ sampleRate: 1000 })
+    expect(detector.update({ db: -70, samples: 5000 }).endpoint).toBe(false)
   })
 })

@@ -2,7 +2,7 @@
 <html lang="en"><head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0a0a09" /><title>HerThing</title>
-  <link rel="stylesheet" href="styles.css?v=cal-sans" />
+  <link rel="stylesheet" href="styles.css?v=voice-state-1" />
 </head><body>
   <main class="world" id="world" data-view="home" data-music="false">
     <canvas id="visual-field" width="160" height="96" aria-hidden="true"></canvas><div class="veil"></div><div class="grain"></div>
@@ -21,10 +21,11 @@
       </div>
       <div class="transport" id="transport"><button data-command="spotify.previous" aria-label="Previous">‹</button><button data-command="spotify.toggle" id="play-button" aria-label="Play or pause">▶</button><button data-command="spotify.next" aria-label="Next">›</button><time id="track-time">0:00</time></div>
     </section>
+    <aside class="turn-state" id="turn-state"><strong id="turn-label">LISTENING</strong><span id="turn-hint">PRESS KNOB WHEN DONE</span></aside>
     <aside class="response" id="assistant-response"></aside>
     <footer><div class="mic off" id="mic-status"><i><b></b></i><span id="mic-label">MIC OFF</span></div><div class="connection offline" id="connection"><i></i><span>HOST OFFLINE</span></div></footer>
     <aside class="toast" id="toast" aria-live="polite"></aside>
     <aside class="volume" id="volume" aria-hidden="true"><span>VOLUME</span><div><i id="volume-level"></i></div><strong id="volume-value">50</strong></aside>
   </main>
-  <script src="visuals.js?v=living-field"></script><script src="app.js?v=living-field"></script>
+  <script src="visuals.js?v=living-field"></script><script src="app.js?v=auto-endpoint-1"></script>
 </body></html>

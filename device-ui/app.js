@@ -58,6 +58,10 @@
     var endpoint = query.get('ws') || 'ws://172.16.42.1:8787/ws'
     try { socket = new WebSocket(endpoint) } catch (_) { scheduleReconnect(); return }
     socket.addEventListener('open', function () {
+      // Host revisions are process-local and restart at one. A reconnected
+      // device must accept the new host's first snapshot even when the prior
+      // process had already published a larger revision.
+      revision = -1
       setConnection(true)
       send(envelope('hello', { role: 'device', capabilities: ['display.800x480', 'touch', 'knob', 'presets', 'back'] }))
     })
@@ -197,7 +201,9 @@
         ? 'YOU · LISTENING'
         : microphone.activity === 'speaking'
           ? 'HERTHING · SPEAKING'
-          : mode.toUpperCase()
+          : microphone.activity === 'thinking' ? 'HERTHING · THINKING' : mode.toUpperCase()
+    $('turn-label').textContent = microphone.activity === 'thinking' ? 'Thinking' : 'Listening'
+    $('turn-hint').textContent = microphone.activity === 'thinking' ? 'ONE MOMENT' : 'SPEAK NATURALLY · PRESS TO END'
     if (window.HerThingVisuals) {
       window.HerThingVisuals.setVoice(microphone.activity, microphone.user_energy, microphone.assistant_energy)
     }

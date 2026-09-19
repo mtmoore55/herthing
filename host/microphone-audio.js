@@ -30,3 +30,34 @@ export function createPcmEnergyAnalyzer({ sampleBytes = 4, reference = 214748364
     }
   }
 }
+
+export function createSpeechEndpointDetector({
+  sampleRate = 16000,
+  speechDb = -63,
+  silenceDb = -65,
+  minimumSpeechMs = 220,
+  trailingSilenceMs = 1200
+} = {}) {
+  let voicedMs = 0
+  let quietMs = 0
+  let armed = false
+
+  return {
+    update(measurement) {
+      const durationMs = measurement.samples / sampleRate * 1000
+      if (!armed) {
+        voicedMs = measurement.db >= speechDb
+          ? voicedMs + durationMs
+          : Math.max(0, voicedMs - durationMs * 0.5)
+        armed = voicedMs >= minimumSpeechMs
+      } else {
+        quietMs = measurement.db < silenceDb ? quietMs + durationMs : 0
+      }
+      return {
+        speech_detected: armed,
+        trailing_silence_ms: Math.round(quietMs),
+        endpoint: armed && quietMs >= trailingSilenceMs
+      }
+    }
+  }
+}

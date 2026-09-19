@@ -144,6 +144,11 @@ real shed audio before committing to local-only transcription.
   audio to disk, concurrent capture is rejected, and every stream exit forces
   the published privacy state back to `MIC OFF`. See
   [`docs/microphone-streaming.md`](docs/microphone-streaming.md).
+- **2026-09-19:** Completed the first physical voice-turn pipeline: knob-driven
+  capture, local whisper.cpp transcription, provider-neutral assistant routing,
+  and local Piper speech through the shed's PipeWire output. Muse now has a
+  constrained headless adapter but still requires CLI authentication. See
+  [`docs/voice-turn.md`](docs/voice-turn.md).
 - **2026-09-19:** Completed the first physical knob-to-transcript loop with a
   pinned local whisper.cpp adapter and RAM-only utterance files. Accuracy was
   usable but speech-end latency measured 4.6 seconds on the shed host, so this
