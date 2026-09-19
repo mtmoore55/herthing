@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 const separator = '\u001f'
 
 function run(args) {
@@ -22,6 +24,18 @@ export function parseMetadata(raw, positionSeconds = '0') {
 }
 
 export function readNowPlaying() {
+  try {
+    const path = `${process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid()}`}/herthing/librespot-state.json`
+    const state = JSON.parse(readFileSync(path, 'utf8'))
+    if (state.playing) {
+      const elapsed = Math.max(0, Date.now() - Number(state.updated_at_ms || Date.now()))
+      state.position_ms = Math.min(state.duration_ms, state.position_ms + elapsed)
+    }
+    delete state.updated_at_ms
+    return state
+  } catch {
+    // Spotifyd/MPRIS remains a supported fallback for other installations.
+  }
   const format = ['{{status}}', '{{title}}', '{{artist}}', '{{album}}', '{{mpris:artUrl}}', '{{mpris:length}}'].join(separator)
   const metadata = run(['playerctl', '--player=spotifyd', 'metadata', '--format', format])
   const position = run(['playerctl', '--player=spotifyd', 'position'])

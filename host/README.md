@@ -50,14 +50,17 @@ to the Car Thing; the device receives only the normalized next event.
 
 ## Spotify Connect
 
-The initial local adapter uses Spotifyd as a Spotify Connect receiver named
-`HerThing Shed`. Spotifyd exposes provider state through MPRIS; HerThing reads
-that generic interface with Playerctl and maps it to `now_playing`. Device
-credentials remain in Spotifyd's private cache and never enter HerThing.
+The development install uses Librespot as a Spotify Connect receiver named
+`HerThing Shed`. It is bound explicitly to the Wi-Fi address so the Car Thing's
+USB network cannot produce an unreachable discovery record. Librespot's event
+hook writes normalized ephemeral state under `$XDG_RUNTIME_DIR`; HerThing maps
+that state to `now_playing`. Credentials remain in Librespot's private cache and
+never enter HerThing.
 
 Select `HerThing Shed` once from an official Spotify client to pair it. The
 dashboard then receives track, artist, album, artwork, progress, and play state.
-The device's previous, play/pause, and next controls are translated to MPRIS.
+MPRIS remains a supported adapter fallback. Direct controls for Librespot need
+a separate control path and are not yet enabled.
 
 Health and current state are available at:
 
