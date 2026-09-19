@@ -10,7 +10,7 @@
       <div class="clock-wrap"><time id="clock">6:02 PM</time><span id="date">FRI · SEP 18</span></div>
       <div class="weather" id="weather"><span class="weather-symbol" id="weather-symbol">—</span><strong id="temperature">--°</strong><small id="condition">Weather unavailable</small></div>
     </header>
-    <section class="next" data-panel="calendar"><p class="eyebrow">NEXT</p>
+    <section class="next" data-panel="calendar"><p class="eyebrow" id="event-kicker">NEXT</p>
       <div class="empty-state" id="event-empty">Calendar unavailable</div>
       <div class="event-state hidden" id="event-state"><h1 id="event-title"></h1><p><span id="event-time"></span><strong id="event-relative"></strong><span id="event-location"></span></p></div>
     </section>
@@ -21,6 +21,7 @@
       </div>
       <div class="transport" id="transport"><button data-command="spotify.previous" aria-label="Previous">‹</button><button data-command="spotify.toggle" id="play-button" aria-label="Play or pause">▶</button><button data-command="spotify.next" aria-label="Next">›</button><time id="track-time">0:00</time></div>
     </section>
+    <aside class="response" id="assistant-response"></aside>
     <footer><div class="mic off" id="mic-status"><i><b></b></i><span id="mic-label">MIC OFF</span></div><div class="connection offline" id="connection"><i></i><span>HOST OFFLINE</span></div></footer>
     <aside class="toast" id="toast" aria-live="polite"></aside>
     <aside class="volume" id="volume" aria-hidden="true"><span>VOLUME</span><div><i id="volume-level"></i></div><strong id="volume-value">50</strong></aside>
