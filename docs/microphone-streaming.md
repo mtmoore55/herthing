@@ -45,7 +45,7 @@ and publish OFF before presenting the state visually.
 and the microphone state machine. Its local CGI control surface is reachable
 only over the dedicated device link. Knob press toggles a conversation stream;
 preset 4 provides a global OFF override. The host applies a conservative energy endpoint detector:
-after at least 220 ms of detected speech, 1.2 seconds below the silence
+after a 450 ms startup guard and at least 300 ms of detected speech, 0.9 seconds below the silence
 threshold ends the utterance automatically. A second knob press remains an
 immediate manual endpoint, and silence alone never starts transcription.
 Capture uses a chunked upload, and the same PCM stream fans out in host memory

@@ -20,5 +20,5 @@ printf '%s  %s\n' "$model_sha" "$model" | sha1sum --check --strict
 
 mise exec -- cmake -S "$source_dir" -B "$source_dir/build" \
   -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-  -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DGGML_CCACHE=OFF
-mise exec -- cmake --build "$source_dir/build" --target whisper-cli -j2
+  -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=ON -DGGML_CCACHE=OFF
+mise exec -- cmake --build "$source_dir/build" --target whisper-cli whisper-server -j2

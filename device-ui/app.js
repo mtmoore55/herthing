@@ -203,7 +203,9 @@
           ? 'HERTHING · SPEAKING'
           : microphone.activity === 'thinking' ? 'HERTHING · THINKING' : mode.toUpperCase()
     $('turn-label').textContent = microphone.activity === 'thinking' ? 'Thinking' : 'Listening'
-    $('turn-hint').textContent = microphone.activity === 'thinking' ? 'ONE MOMENT' : 'SPEAK NATURALLY · PRESS TO END'
+    $('turn-hint').textContent = microphone.activity === 'thinking'
+      ? 'ONE MOMENT · PRESS TO END CONVERSATION'
+      : 'SPEAK NATURALLY · PRESS TO END CONVERSATION'
     if (window.HerThingVisuals) {
       window.HerThingVisuals.setVoice(microphone.activity, microphone.user_energy, microphone.assistant_energy)
     }

@@ -3,6 +3,14 @@ import { unlink } from 'node:fs/promises'
 
 const defaultBinary = resolve(import.meta.dir, '../.artifacts/src/whisper.cpp/build/bin/whisper-cli')
 const defaultModel = resolve(import.meta.dir, '../.artifacts/src/whisper.cpp/models/ggml-tiny.en.bin')
+const defaultServerUrl = 'http://127.0.0.1:8792/inference'
+const domainPrompt = 'HerThing is a voice assistant. Requests may mention Spotify, calendars, weather, meetings, reminders, and music.'
+
+export function normalizeTranscript(value) {
+  const text = String(value || '').trim().replace(/\s+/g, ' ')
+  if (/^\[(blank_audio|no_speech|silence)\]$/i.test(text)) return ''
+  return text
+}
 
 async function run(command, args) {
   const process = Bun.spawn([command, ...args], { stdout: 'pipe', stderr: 'pipe' })
@@ -13,6 +21,21 @@ async function run(command, args) {
   ])
   if (exitCode !== 0) throw new Error(stderr.trim() || `${command} exited ${exitCode}`)
   return { stdout, stderr }
+}
+
+async function transcribeWithServer(wavPath, options) {
+  const form = new FormData()
+  form.append('file', Bun.file(wavPath), 'utterance.wav')
+  form.append('response_format', 'json')
+  form.append('temperature', '0.0')
+  form.append('temperature_inc', '0.0')
+  form.append('prompt', domainPrompt)
+  const response = await fetch(options.serverUrl || process.env.HERTHING_WHISPER_SERVER_URL || defaultServerUrl, {
+    method: 'POST', body: form, signal: AbortSignal.timeout(45000)
+  })
+  if (!response.ok) throw new Error(`whisper server returned ${response.status}`)
+  const result = await response.json()
+  return normalizeTranscript(result.text)
 }
 
 export async function transcribeS32le(pcm, options = {}) {
@@ -30,14 +53,20 @@ export async function transcribeS32le(pcm, options = {}) {
       '-af', 'highpass=f=80,lowpass=f=7600,volume=24dB,alimiter=limit=0.9',
       '-c:a', 'pcm_s16le', wavPath
     ])
-    const result = await run(binary, [
-      '--model', model, '--file', wavPath, '--threads', '4',
-      '--language', 'en', '--no-gpu', '--no-timestamps', '--no-prints',
-      '--best-of', '1', '--beam-size', '1',
-      '--prompt', 'HerThing is a voice assistant. Requests may mention Spotify, calendars, weather, meetings, reminders, and music.'
-    ])
+    let text
+    try {
+      text = await transcribeWithServer(wavPath, options)
+    } catch (error) {
+      console.warn('[stt] persistent worker unavailable; using one-shot whisper:', error.message || error)
+      const result = await run(binary, [
+        '--model', model, '--file', wavPath, '--threads', '4',
+        '--language', 'en', '--no-gpu', '--no-timestamps', '--no-prints',
+        '--best-of', '1', '--beam-size', '1', '--prompt', domainPrompt
+      ])
+      text = normalizeTranscript(result.stdout)
+    }
     return {
-      text: result.stdout.trim().replace(/\s+/g, ' '),
+      text,
       elapsed_ms: Math.round(performance.now() - startedAt)
     }
   } finally {

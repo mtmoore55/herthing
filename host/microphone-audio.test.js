@@ -32,7 +32,7 @@ describe('PCM microphone energy', () => {
 
 describe('speech endpoint detector', () => {
   test('ends after sustained speech followed by silence', () => {
-    const detector = createSpeechEndpointDetector({ sampleRate: 1000, minimumSpeechMs: 200, trailingSilenceMs: 1000 })
+    const detector = createSpeechEndpointDetector({ sampleRate: 1000, startupDelayMs: 0, minimumSpeechMs: 200, trailingSilenceMs: 1000 })
     expect(detector.update({ db: -55, samples: 200 }).speech_detected).toBe(true)
     expect(detector.update({ db: -70, samples: 900 }).endpoint).toBe(false)
     expect(detector.update({ db: -70, samples: 100 }).endpoint).toBe(true)
@@ -41,5 +41,11 @@ describe('speech endpoint detector', () => {
   test('does not endpoint ambient silence before speech', () => {
     const detector = createSpeechEndpointDetector({ sampleRate: 1000 })
     expect(detector.update({ db: -70, samples: 5000 }).endpoint).toBe(false)
+  })
+
+  test('ignores button and capture startup transients', () => {
+    const detector = createSpeechEndpointDetector({ sampleRate: 1000, startupDelayMs: 450, minimumSpeechMs: 200 })
+    expect(detector.update({ db: -45, samples: 200 }).speech_detected).toBe(false)
+    expect(detector.update({ db: -70, samples: 250 }).speech_detected).toBe(false)
   })
 })

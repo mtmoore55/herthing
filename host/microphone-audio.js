@@ -35,16 +35,22 @@ export function createSpeechEndpointDetector({
   sampleRate = 16000,
   speechDb = -63,
   silenceDb = -65,
-  minimumSpeechMs = 220,
-  trailingSilenceMs = 1200
+  startupDelayMs = 450,
+  minimumSpeechMs = 300,
+  trailingSilenceMs = 900
 } = {}) {
   let voicedMs = 0
   let quietMs = 0
   let armed = false
+  let elapsedMs = 0
 
   return {
     update(measurement) {
       const durationMs = measurement.samples / sampleRate * 1000
+      elapsedMs += durationMs
+      if (elapsedMs < startupDelayMs) {
+        return { speech_detected: false, trailing_silence_ms: 0, endpoint: false }
+      }
       if (!armed) {
         voicedMs = measurement.db >= speechDb
           ? voicedMs + durationMs

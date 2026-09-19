@@ -3,14 +3,29 @@
 The first end-to-end Phase 4 path is now:
 
 ```text
-knob press -> device PCM stream -> knob press -> whisper.cpp STT
-           -> assistant adapter -> Piper TTS -> PipeWire default sink
+knob press -> device PCM stream -> automatic endpoint -> whisper.cpp STT
+           -> assistant adapter -> Piper TTS -> automatic follow-up listening
 ```
 
 The host owns generic `transcript`, `assistant_response`, and microphone states.
 The Car Thing UI has no knowledge of Muse, Piper, or whisper.cpp. During a turn
 it continuously moves through `listening`, `thinking`, and `speaking`, and then
-returns to OFF in a `finally` block.
+returns to listening while the conversation is open. Every stream closure still
+passes through a `finally` block; explicit exit and failures publish OFF.
+
+## Conversation lifecycle
+
+A knob press opens a three-minute conversation session and resets the provider's
+conversation chain. Speech endpointing submits each utterance automatically.
+After HerThing speaks, capture reopens and the user can continue without another
+button press or wake word. Each real utterance extends the session; silent
+15-second capture windows are recycled in memory without transcription or
+storage until the session expires. Pressing the knob again, pressing preset 4,
+or reaching the inactivity deadline closes the session and publishes MIC OFF.
+
+The Meta adapter carries `previous_response_id` across turns, so corrections,
+pronouns, and follow-ups share server-managed context without coupling the
+device UI to Muse internals.
 
 ## Assistant providers
 

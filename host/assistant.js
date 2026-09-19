@@ -5,6 +5,10 @@ const museModel = process.env.HERTHING_MUSE_MODEL || 'muse-spark-1.3'
 const metaBaseUrl = process.env.HERTHING_META_BASE_URL || 'https://api.meta.ai/v1'
 let previousMetaResponseId = null
 
+export function resetAssistantConversation() {
+  previousMetaResponseId = null
+}
+
 function minutesUntil(event) {
   const start = event?.start || event?.start_time || event?.starts_at
   if (!start) return null
@@ -93,7 +97,7 @@ async function metaResponse(text, context) {
     model: museModel,
     instructions: 'You are HerThing, an ambient personal assistant. Reply naturally in one or two short spoken sentences. Never use markdown.',
     input: musePrompt(text, context),
-    reasoning: { effort: 'low' },
+    reasoning: { effort: process.env.HERTHING_META_REASONING_EFFORT || 'minimal' },
     // Muse may spend roughly 100 hidden reasoning tokens even on a very short
     // spoken answer. Leave enough room that reasoning cannot consume the
     // entire response budget before output_text is emitted.

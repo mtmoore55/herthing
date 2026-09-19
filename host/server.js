@@ -4,7 +4,7 @@ import { executeMediaCommand, readNowPlaying } from './media-player.js'
 import { setSystemVolume } from './system-volume.js'
 import { createPcmEnergyAnalyzer, createSpeechEndpointDetector } from './microphone-audio.js'
 import { transcribeS32le } from './stt-whisper.js'
-import { askAssistant, assistantConfig } from './assistant.js'
+import { askAssistant, assistantConfig, resetAssistantConversation } from './assistant.js'
 import { speak, speechConfig } from './speech.js'
 
 const protocol = 'herthing/1'
@@ -13,6 +13,13 @@ const port = Number(process.env.HERTHING_PORT || 8787)
 const deviceControlUrl = process.env.HERTHING_DEVICE_CONTROL_URL || 'http://172.16.42.2:8790/cgi-bin/microphone'
 const clients = new Set()
 let microphoneStreamActive = false
+const conversationTimeoutMs = Number(process.env.HERTHING_CONVERSATION_TIMEOUT_MS || 3 * 60 * 1000)
+const followupDelayMs = Number(process.env.HERTHING_FOLLOWUP_DELAY_MS || 800)
+const noSpeechCycleMs = Number(process.env.HERTHING_NO_SPEECH_CYCLE_MS || 15000)
+let conversationActive = false
+let conversationExpiresAt = 0
+let conversationGeneration = 0
+let followupTimer = null
 
 let revision = 1
 let state = {
@@ -20,6 +27,7 @@ let state = {
   next_event: null,
   now_playing: null,
   microphone: { mode: 'off', activity: 'idle' },
+  conversation: { active: false, expires_at: null },
   transcript: null,
   assistant_response: null
 }
@@ -69,6 +77,7 @@ function mergeState(patch) {
     'next_event',
     'now_playing',
     'microphone',
+    'conversation',
     'transcript',
     'assistant_response'
   ]
@@ -77,6 +86,57 @@ function mergeState(patch) {
   }
   revision += 1
   broadcast()
+}
+
+function publishConversation() {
+  mergeState({
+    conversation: {
+      active: conversationActive,
+      expires_at: conversationActive ? new Date(conversationExpiresAt).toISOString() : null
+    }
+  })
+}
+
+function extendConversation() {
+  conversationExpiresAt = Date.now() + conversationTimeoutMs
+  publishConversation()
+}
+
+function beginConversation() {
+  clearTimeout(followupTimer)
+  conversationGeneration += 1
+  conversationActive = true
+  resetAssistantConversation()
+  extendConversation()
+}
+
+function endConversation() {
+  clearTimeout(followupTimer)
+  conversationGeneration += 1
+  conversationActive = false
+  conversationExpiresAt = 0
+  publishConversation()
+  mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
+}
+
+function scheduleFollowup() {
+  clearTimeout(followupTimer)
+  if (!conversationActive) return
+  const generation = conversationGeneration
+  followupTimer = setTimeout(async () => {
+    if (!conversationActive || generation !== conversationGeneration) return
+    if (Date.now() >= conversationExpiresAt) {
+      endConversation()
+      return
+    }
+    try {
+      mergeState({ microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 } })
+      await controlMicrophone('start')
+    } catch (error) {
+      console.error('[conversation] follow-up capture failed:', error.message || error)
+      endConversation()
+    }
+  }, followupDelayMs)
 }
 
 function sameValue(left, right) {
@@ -157,6 +217,8 @@ const server = Bun.serve({
       let loudestDb = -120
       let peakEnergy = 0
       let autoStopRequested = false
+      let speechDetected = false
+      let noSpeechTimeout = false
       const audioChunks = []
       mergeState({
         microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 },
@@ -172,6 +234,7 @@ const server = Bun.serve({
           audioChunks.push(value.slice())
           const measurement = analyzer.analyze(value)
           const endpoint = endpointDetector.update(measurement)
+          speechDetected ||= endpoint.speech_detected
           loudestDb = Math.max(loudestDb, measurement.db)
           peakEnergy = Math.max(peakEnergy, measurement.energy)
           const now = performance.now()
@@ -180,6 +243,12 @@ const server = Bun.serve({
             mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
             console.log(`[vad] speech endpoint after ${Math.round(bytes / (16000 * 4) * 1000)} ms`)
             controlMicrophone('stop').catch((error) => console.error('[vad] auto-stop failed:', error.message || error))
+          }
+          if (!autoStopRequested && !speechDetected && bytes >= 16000 * 4 * noSpeechCycleMs / 1000) {
+            autoStopRequested = true
+            noSpeechTimeout = true
+            console.log(`[conversation] no speech in ${noSpeechCycleMs} ms; cycling capture`)
+            controlMicrophone('stop').catch((error) => console.error('[conversation] capture cycle failed:', error.message || error))
           }
           if (!autoStopRequested && measurement.samples && now - lastBroadcast >= 75) {
             lastBroadcast = now
@@ -193,7 +262,8 @@ const server = Bun.serve({
         }
         let transcription = null
         let assistant = null
-        if (bytes >= 16000 * 4 * 0.4) {
+        if (!noSpeechTimeout && speechDetected && bytes >= 16000 * 4 * 0.4) {
+          extendConversation()
           mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
           try {
             transcription = await transcribeS32le(Buffer.concat(audioChunks.map((chunk) => Buffer.from(chunk))))
@@ -201,13 +271,17 @@ const server = Bun.serve({
             console.log(`[stt] ${transcription.elapsed_ms} ms: ${transcription.text}`)
             if (transcription.text) {
               assistant = await askAssistant(transcription.text, state)
-              mergeState({
-                assistant_response: assistant.text,
-                microphone: { mode: 'conversation', activity: 'speaking', user_energy: 0, assistant_energy: 0.45 }
-              })
-              console.log(`[assistant:${assistant.provider}] ${assistant.elapsed_ms} ms: ${assistant.text}`)
-              const speech = await speak(assistant.text)
-              console.log(`[tts] first audio ${speech.first_audio_ms ?? 'unknown'} ms; complete ${speech.elapsed_ms} ms${speech.skipped ? ' (disabled)' : ''}`)
+              if (conversationActive) {
+                mergeState({
+                  assistant_response: assistant.text,
+                  microphone: { mode: 'conversation', activity: 'speaking', user_energy: 0, assistant_energy: 0.45 }
+                })
+                console.log(`[assistant:${assistant.provider}] ${assistant.elapsed_ms} ms: ${assistant.text}`)
+                const speech = await speak(assistant.text)
+                console.log(`[tts] first audio ${speech.first_audio_ms ?? 'unknown'} ms; complete ${speech.elapsed_ms} ms${speech.skipped ? ' (disabled)' : ''}`)
+              } else {
+                console.log('[conversation] response discarded after session ended')
+              }
             }
           } catch (error) {
             console.error('[voice] turn failed:', error.message || error)
@@ -216,7 +290,12 @@ const server = Bun.serve({
         return Response.json({ ok: true, bytes, loudest_db: Number(loudestDb.toFixed(1)), peak_energy: Number(peakEnergy.toFixed(3)), transcription, assistant })
       } finally {
         microphoneStreamActive = false
-        mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0 } })
+        if (conversationActive) {
+          mergeState({ microphone: { mode: 'conversation', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
+          scheduleFollowup()
+        } else {
+          mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
+        }
       }
     }
 
@@ -255,28 +334,20 @@ const server = Bun.serve({
           }
         }
         if (message.input === 'knob_press' || message.input === 'preset_4') {
-          let action = 'off'
-          if (message.input === 'knob_press') {
-            if (state.microphone.activity === 'listening') {
-              action = 'stop'
-              mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
-            } else if (!microphoneStreamActive) {
-              action = 'start'
-              mergeState({
-                microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 },
-                transcript: null,
-                assistant_response: null
-              })
-            } else {
-              send(ws, envelope('ack', { reply_to: message.id }))
-              return
-            }
-          } else {
-            mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0 } })
+          const exiting = message.input === 'preset_4' || conversationActive
+          const action = exiting ? 'off' : 'start'
+          if (exiting) endConversation()
+          else {
+            beginConversation()
+            mergeState({
+              microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 },
+              transcript: null,
+              assistant_response: null
+            })
           }
           controlMicrophone(action).catch((error) => {
             console.error('[microphone] control failed:', error.message || error)
-            mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0 } })
+            endConversation()
           })
         }
         send(ws, envelope('ack', { reply_to: message.id }))
