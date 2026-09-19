@@ -8,6 +8,7 @@
   var toastTimer = null
   var volumeTimer = null
   var volume = 50
+  var hostClockSkewMs = 0
   var state = {
     clock: { utc_offset_minutes: 0 },
     weather: null,
@@ -64,6 +65,9 @@
       if (message.type === 'dashboard_state' && message.revision >= revision) {
         revision = message.revision
         state = message
+        if (message.clock && Number(message.clock.epoch_ms)) {
+          hostClockSkewMs = Number(message.clock.epoch_ms) - Date.now()
+        }
         render()
       }
       if (message.type === 'error' && message.message) showToast(message.message.toUpperCase())
@@ -87,7 +91,7 @@
   }
 
   function tick() {
-    var now = new Date()
+    var now = new Date(Date.now() + hostClockSkewMs)
     $('clock').textContent = formatTime(now)
     var wallClock = wallClockDate(now)
     var weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -129,7 +133,7 @@
     $('event-title').textContent = event.title
     $('event-time').textContent = formatTime(new Date(event.starts_at))
     $('event-location').textContent = event.location || ''
-    renderEventRelative(new Date())
+    renderEventRelative(new Date(Date.now() + hostClockSkewMs))
   }
 
   function formatDuration(milliseconds) {

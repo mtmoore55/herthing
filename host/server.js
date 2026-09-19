@@ -21,7 +21,8 @@ let state = {
 function clockState() {
   return {
     time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    utc_offset_minutes: -new Date().getTimezoneOffset()
+    utc_offset_minutes: -new Date().getTimezoneOffset(),
+    epoch_ms: Date.now()
   }
 }
 

@@ -45,9 +45,10 @@
               "type": "object",
               "properties": {
                 "time_zone": { "type": "string" },
-                "utc_offset_minutes": { "type": "integer", "minimum": -840, "maximum": 840 }
+                "utc_offset_minutes": { "type": "integer", "minimum": -840, "maximum": 840 },
+                "epoch_ms": { "type": "integer", "minimum": 0 }
               },
-              "required": ["time_zone", "utc_offset_minutes"]
+              "required": ["time_zone", "utc_offset_minutes", "epoch_ms"]
             },
             "weather": {
               "type": ["object", "null"],
