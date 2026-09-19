@@ -1,6 +1,7 @@
 import { fetchWeather, weatherConfig } from './weather.js'
 import { calendarConfig, fetchNextEvent } from './calendar.js'
 import { executeMediaCommand, readNowPlaying } from './media-player.js'
+import { setSystemVolume } from './system-volume.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
@@ -147,6 +148,13 @@ const server = Bun.serve({
 
       if (message.type === 'input_event') {
         console.log(`[input] ${message.input}`, message.value ?? '')
+        if (['knob_left', 'knob_right'].includes(message.input)) {
+          try {
+            setSystemVolume(message.value?.volume)
+          } catch (error) {
+            console.error('[volume] update failed:', error.message || error)
+          }
+        }
         send(ws, envelope('ack', { reply_to: message.id }))
         return
       }

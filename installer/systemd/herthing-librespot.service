@@ -1,0 +1,15 @@
+[Unit]
+Description=HerThing Spotify Connect receiver
+Documentation=https://github.com/librespot-org/librespot
+Wants=network-online.target sound.target
+After=network-online.target sound.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/herthing/environment
+ExecStart=/usr/bin/librespot --name "HerThing Shed" --device-type speaker --bitrate 320 --backend pulseaudio --mixer softvol --initial-volume 90 --enable-volume-normalisation --normalisation-pregain 0 --cache %h/.cache/librespot/audio --system-cache %h/.cache/librespot/system --zeroconf-port 4071 --zeroconf-backend libmdns --zeroconf-interface ${HERTHING_WIFI_ADDRESS} --onevent %h/herthing/host/librespot-event.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

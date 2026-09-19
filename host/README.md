@@ -62,6 +62,16 @@ dashboard then receives track, artist, album, artwork, progress, and play state.
 MPRIS remains a supported adapter fallback. Direct controls for Librespot need
 a separate control path and are not yet enabled.
 
+Set `HERTHING_WIFI_ADDRESS` in the private environment file and install
+`installer/systemd/herthing-librespot.service` as a user unit. The Wi-Fi LAN
+must allow UDP 5353 for discovery and TCP 4071 for pairing. The development
+host limits both firewall rules to its Wi-Fi interface and local subnet.
+
+The physical knob changes the host's default PipeWire sink through `wpctl`.
+Spotify play/pause/previous/next require the narrowly scoped Spotify Web API
+`user-modify-playback-state` permission; this is intentionally separate from
+the local metadata path.
+
 Health and current state are available at:
 
 ```bash

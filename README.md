@@ -123,3 +123,7 @@ real shed audio before committing to local-only transcription.
 - **2026-09-18:** Connected the development Google Calendar through its private
   read-only feed, created a `HerThing Shed` Spotify Connect receiver, and added
   a generic MPRIS now-playing/control adapter for the dashboard.
+- **2026-09-18:** Replaced the receiver with Wi-Fi-bound Librespot after physical
+  discovery testing exposed an ambiguous multi-interface mDNS record. Verified
+  live audio and dashboard metadata, added real knob-to-PipeWire volume, and
+  packaged the receiver as a reproducible user service.
