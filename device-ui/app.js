@@ -9,6 +9,7 @@
   var volumeTimer = null
   var volume = 50
   var state = {
+    clock: { utc_offset_minutes: 0 },
     weather: null,
     next_event: null,
     now_playing: null,
@@ -72,19 +73,26 @@
   }
 
   function scheduleReconnect() { clearTimeout(retryTimer); retryTimer = setTimeout(connect, 2000) }
+  function wallClockDate(date) {
+    var offset = state.clock && Number(state.clock.utc_offset_minutes)
+    return new Date(date.getTime() + (isNaN(offset) ? 0 : offset) * 60000)
+  }
+
   function formatTime(date) {
-    var hours = date.getHours()
+    var wallClock = wallClockDate(date)
+    var hours = wallClock.getUTCHours()
     var suffix = hours >= 12 ? 'PM' : 'AM'
     hours = hours % 12 || 12
-    return hours + ':' + String(date.getMinutes()).padStart(2, '0') + ' ' + suffix
+    return hours + ':' + String(wallClock.getUTCMinutes()).padStart(2, '0') + ' ' + suffix
   }
 
   function tick() {
     var now = new Date()
     $('clock').textContent = formatTime(now)
+    var wallClock = wallClockDate(now)
     var weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
     var months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-    $('date').textContent = weekdays[now.getDay()] + ' · ' + months[now.getMonth()] + ' ' + now.getDate()
+    $('date').textContent = weekdays[wallClock.getUTCDay()] + ' · ' + months[wallClock.getUTCMonth()] + ' ' + wallClock.getUTCDate()
     renderEventRelative(now)
   }
 

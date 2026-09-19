@@ -18,6 +18,13 @@ let state = {
   assistant_response: null
 }
 
+function clockState() {
+  return {
+    time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    utc_offset_minutes: -new Date().getTimezoneOffset()
+  }
+}
+
 function id() {
   return crypto.randomUUID()
 }
@@ -27,7 +34,7 @@ function envelope(type, fields = {}) {
 }
 
 function snapshot() {
-  return envelope('dashboard_state', { revision, ...state })
+  return envelope('dashboard_state', { revision, clock: clockState(), ...state })
 }
 
 function send(ws, message) {

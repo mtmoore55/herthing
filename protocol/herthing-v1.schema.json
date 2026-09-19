@@ -41,6 +41,14 @@
           "properties": {
             "type": { "const": "dashboard_state" },
             "revision": { "type": "integer", "minimum": 0 },
+            "clock": {
+              "type": "object",
+              "properties": {
+                "time_zone": { "type": "string" },
+                "utc_offset_minutes": { "type": "integer", "minimum": -840, "maximum": 840 }
+              },
+              "required": ["time_zone", "utc_offset_minutes"]
+            },
             "weather": {
               "type": ["object", "null"],
               "properties": {
@@ -85,7 +93,7 @@
             "transcript": { "type": ["string", "null"] },
             "assistant_response": { "type": ["string", "null"] }
           },
-          "required": ["revision", "weather", "next_event", "now_playing", "microphone"]
+          "required": ["revision", "clock", "weather", "next_event", "now_playing", "microphone"]
         }
       ]
     },

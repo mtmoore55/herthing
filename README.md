@@ -127,3 +127,6 @@ real shed audio before committing to local-only transcription.
   discovery testing exposed an ambiguous multi-interface mDNS record. Verified
   live audio and dashboard metadata, added real knob-to-PipeWire volume, and
   packaged the receiver as a reproducible user service.
+- **2026-09-18:** Moved wall-clock timezone ownership to the host so the Car
+  Thing's UTC-configured runtime renders the clock and calendar consistently in
+  the host's local timezone, including daylight-saving offsets.
