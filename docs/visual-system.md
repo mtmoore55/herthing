@@ -7,6 +7,13 @@ low-resolution 20×12 grid of flat color facets: broad overlapping influences
 produce stepped linear, radial, and diamond-like structures without blurring or
 enlarging the source artwork.
 
+HerThing bundles Cal Sans v2 rather than depending on host fonts. Cal Sans is
+used at display optical sizes for the clock, events, track titles, weather, and
+ephemeral assistant language. Cal Sans Text UI handles compact metadata and
+system labels. Static WOFF2 instances keep rendering deterministic on the Car
+Thing's older Chromium; the upstream SIL Open Font License is distributed next
+to the font assets.
+
 ## Inputs
 
 - `now_playing.art_url` supplies the music palette. The device samples small
