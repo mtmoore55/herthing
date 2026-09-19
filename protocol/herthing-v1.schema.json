@@ -56,7 +56,8 @@
               "properties": {
                 "title": { "type": "string" },
                 "starts_at": { "type": "string", "format": "date-time" },
-                "location": { "type": ["string", "null"] }
+                "location": { "type": ["string", "null"] },
+                "all_day": { "type": "boolean" }
               },
               "required": ["title", "starts_at"]
             },

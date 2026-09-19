@@ -2,6 +2,7 @@
 .artifacts/
 dist/
 build/
+node_modules/
 
 # Local configuration and credentials.
 .env

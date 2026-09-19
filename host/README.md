@@ -34,6 +34,20 @@ Restart with `systemctl --user restart herthing-host.service`. Weather refreshes
 at startup and every ten minutes. Until coordinates are configured, weather is
 shown as unavailable.
 
+## Calendar
+
+The read-only calendar adapter accepts a private iCalendar feed from Google,
+Apple, Fastmail, Nextcloud, or another RFC 5545 provider. Add its secret URL to
+the private environment file:
+
+```ini
+HERTHING_CALENDAR_ICS_URL=https://calendar-provider.example/private.ics
+```
+
+The feed is fetched at startup and every five minutes. Recurring events are
+expanded locally. Feed contents and URLs are never stored by HerThing or sent
+to the Car Thing; the device receives only the normalized next event.
+
 Health and current state are available at:
 
 ```bash

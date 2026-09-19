@@ -1,4 +1,5 @@
 import { fetchWeather, weatherConfig } from './weather.js'
+import { calendarConfig, fetchNextEvent } from './calendar.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
@@ -63,6 +64,7 @@ function mergeState(patch) {
 }
 
 const configuredWeather = weatherConfig()
+const configuredCalendar = calendarConfig()
 async function refreshWeather() {
   if (!configuredWeather) return
   try {
@@ -70,6 +72,16 @@ async function refreshWeather() {
     console.log('[weather] current conditions refreshed')
   } catch (error) {
     console.error('[weather] refresh failed:', error.message || error)
+  }
+}
+
+async function refreshCalendar() {
+  if (!configuredCalendar) return
+  try {
+    mergeState({ next_event: await fetchNextEvent(configuredCalendar) })
+    console.log('[calendar] next event refreshed')
+  } catch (error) {
+    console.error('[calendar] refresh failed:', error.message || error)
   }
 }
 
@@ -153,4 +165,10 @@ if (configuredWeather) {
   setInterval(refreshWeather, 10 * 60 * 1000)
 } else {
   console.log('[weather] disabled; set HERTHING_LATITUDE and HERTHING_LONGITUDE to enable')
+}
+if (configuredCalendar) {
+  refreshCalendar()
+  setInterval(refreshCalendar, 5 * 60 * 1000)
+} else {
+  console.log('[calendar] disabled; set HERTHING_CALENDAR_ICS_URL to enable')
 }

@@ -117,3 +117,6 @@ real shed audio before committing to local-only transcription.
   systemd user service. Enabled it on the development host and verified that the
   physical Car Thing reconnects automatically. Live weather remains opt-in
   through explicit location coordinates.
+- **2026-09-18:** Activated live weather for the development device and added a
+  provider-neutral, read-only iCalendar adapter with recurring-event support.
+  Calendar feed credentials remain private host configuration.
