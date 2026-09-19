@@ -1,5 +1,6 @@
 import { fetchWeather, weatherConfig } from './weather.js'
 import { calendarConfig, fetchNextEvent } from './calendar.js'
+import { executeMediaCommand, readNowPlaying } from './media-player.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
@@ -61,6 +62,15 @@ function mergeState(patch) {
   }
   revision += 1
   broadcast()
+}
+
+function sameValue(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function refreshNowPlaying() {
+  const nowPlaying = readNowPlaying()
+  if (!sameValue(nowPlaying, state.now_playing)) mergeState({ now_playing: nowPlaying })
 }
 
 const configuredWeather = weatherConfig()
@@ -143,11 +153,17 @@ const server = Bun.serve({
 
       if (message.type === 'command') {
         console.log(`[command] ${message.command}`, message.arguments || {})
-        send(ws, envelope('error', {
-          reply_to: message.id,
-          code: 'integration_unavailable',
-          message: `${message.command} is not connected yet`
-        }))
+        try {
+          if (!executeMediaCommand(message.command)) throw new Error(`${message.command} is not connected yet`)
+          send(ws, envelope('ack', { reply_to: message.id }))
+          setTimeout(refreshNowPlaying, 150)
+        } catch (error) {
+          send(ws, envelope('error', {
+            reply_to: message.id,
+            code: 'integration_unavailable',
+            message: error.message || String(error)
+          }))
+        }
         return
       }
 
@@ -172,3 +188,5 @@ if (configuredCalendar) {
 } else {
   console.log('[calendar] disabled; set HERTHING_CALENDAR_ICS_URL to enable')
 }
+refreshNowPlaying()
+setInterval(refreshNowPlaying, 1000)

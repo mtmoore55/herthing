@@ -48,6 +48,17 @@ The feed is fetched at startup and every five minutes. Recurring events are
 expanded locally. Feed contents and URLs are never stored by HerThing or sent
 to the Car Thing; the device receives only the normalized next event.
 
+## Spotify Connect
+
+The initial local adapter uses Spotifyd as a Spotify Connect receiver named
+`HerThing Shed`. Spotifyd exposes provider state through MPRIS; HerThing reads
+that generic interface with Playerctl and maps it to `now_playing`. Device
+credentials remain in Spotifyd's private cache and never enter HerThing.
+
+Select `HerThing Shed` once from an official Spotify client to pair it. The
+dashboard then receives track, artist, album, artwork, progress, and play state.
+The device's previous, play/pause, and next controls are translated to MPRIS.
+
 Health and current state are available at:
 
 ```bash

@@ -120,3 +120,6 @@ real shed audio before committing to local-only transcription.
 - **2026-09-18:** Activated live weather for the development device and added a
   provider-neutral, read-only iCalendar adapter with recurring-event support.
   Calendar feed credentials remain private host configuration.
+- **2026-09-18:** Connected the development Google Calendar through its private
+  read-only feed, created a `HerThing Shed` Spotify Connect receiver, and added
+  a generic MPRIS now-playing/control adapter for the dashboard.
