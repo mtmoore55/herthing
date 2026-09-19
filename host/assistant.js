@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { askMuseBrowser } from './muse-browser.js'
 
 const museBinary = process.env.HERTHING_MUSE_BINARY || 'muse'
 const museModel = process.env.HERTHING_MUSE_MODEL || 'muse-spark-1.3'
@@ -145,7 +146,11 @@ export async function askAssistant(text, context = {}) {
   const started = performance.now()
   const response = provider === 'meta'
     ? await metaResponse(text, context)
-    : provider === 'muse' ? await museResponse(text, context) : localResponse(text, context)
+    : provider === 'muse'
+      ? await museResponse(text, context)
+      : provider === 'muse-browser'
+        ? await askMuseBrowser(musePrompt(text, context))
+        : localResponse(text, context)
   return { text: response, provider, elapsed_ms: Math.round(performance.now() - started) }
 }
 

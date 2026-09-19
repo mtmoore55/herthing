@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { localResponse, parseMetaResponse, parseMuseJsonl } from './assistant.js'
+import { chooseMuseTarget } from './muse-browser.js'
 
 describe('assistant adapters', () => {
   test('answers next-event questions from shared context', () => {
@@ -16,5 +17,14 @@ describe('assistant adapters', () => {
   test('extracts text from a Meta Responses API result', () => {
     expect(parseMetaResponse({ output: [{ content: [{ type: 'output_text', text: 'Hello from Muse.' }] }] }))
       .toBe('Hello from Muse.')
+  })
+
+  test('selects only a Muse page from browser debugging targets', () => {
+    const target = chooseMuseTarget([
+      { type: 'page', url: 'https://example.com/' },
+      { type: 'worker', url: 'https://muse.ai/worker' },
+      { type: 'page', url: 'https://muse.ai/chat/ziggy' }
+    ])
+    expect(target?.url).toBe('https://muse.ai/chat/ziggy')
   })
 })

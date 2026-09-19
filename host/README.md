@@ -112,3 +112,44 @@ workspace writes disabled. Prepare the pinned local speech runtime with:
 ```bash
 ./scripts/prepare-piper.sh
 ```
+
+## Personal Muse browser adapter
+
+Meta does not currently expose a public API for the consumer Muse agent's
+memory, connectors, or secure runtime. The experimental `muse-browser` adapter
+drives a dedicated, visible Muse browser session through Chrome DevTools
+Protocol. It does not reuse or inspect the user's everyday browser profile.
+
+Start the isolated browser and sign in to Muse once:
+
+```bash
+./scripts/start-muse-browser.sh
+```
+
+For an always-on installation, copy and enable the included user service:
+
+```bash
+cp installer/systemd/herthing-muse-browser.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now herthing-muse-browser.service
+```
+
+The profile is stored with owner-only permissions at
+`~/.local/share/herthing/muse-browser` and must never be committed. Once the
+dedicated Muse chat is ready, configure the host:
+
+```ini
+HERTHING_ASSISTANT_PROVIDER=muse-browser
+HERTHING_MUSE_BROWSER_DEBUG_URL=http://127.0.0.1:9333
+```
+
+Keep the browser open while using this provider. It is intentionally an
+experimental adapter: upstream UI changes can break it. The direct `meta`
+provider remains available as the reliable low-latency fallback.
+
+If Muse changes its markup, inspect only a known test response without dumping
+private conversation history:
+
+```bash
+bun scripts/inspect-muse-dom.js 'Exact known test response.'
+```
