@@ -16,7 +16,8 @@ describe('PCM microphone energy', () => {
   })
 
   test('maps native Car Thing speech levels into the visual range', () => {
-    const result = createPcmEnergyAnalyzer().analyze(pcm32([58, -58, 58, -58]))
+    const speechSample = Math.round(2147483648 * Math.pow(10, -55 / 20))
+    const result = createPcmEnergyAnalyzer().analyze(pcm32([speechSample, -speechSample, speechSample, -speechSample]))
     expect(result.db).toBeGreaterThan(-56)
     expect(result.energy).toBeGreaterThan(0.6)
     expect(result.energy).toBeLessThan(0.8)

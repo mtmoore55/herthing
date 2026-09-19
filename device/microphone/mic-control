@@ -1,0 +1,49 @@
+#!/bin/sh
+set -eu
+
+runtime=/run/herthing-microphone
+pidfile="$runtime/capture.pid"
+logfile=/var/local/herthing/microphone/capture.log
+capture=/var/local/herthing/bin/tinycap
+endpoint=http://172.16.42.1:8787/api/microphone/stream
+
+mkdir -p "$runtime"
+
+running() {
+  [ -s "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null
+}
+
+start_capture() {
+  if running; then
+    echo conversation
+    return
+  fi
+  rm -f "$pidfile"
+  : > "$logfile"
+  /usr/bin/setsid /bin/sh -c "'$capture' -- -D 0 -d 0 -c 1 -r 16000 -b 32 | /usr/bin/curl -fsS -X POST --upload-file - '$endpoint'" </dev/null >>"$logfile" 2>&1 &
+  echo "$!" > "$pidfile"
+  echo conversation
+}
+
+stop_capture() {
+  if running; then
+    pid=$(cat "$pidfile")
+    kill -TERM "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+    count=0
+    while kill -0 "$pid" 2>/dev/null && [ "$count" -lt 20 ]; do
+      sleep .05
+      count=$((count + 1))
+    done
+    kill -KILL "-$pid" 2>/dev/null || true
+  fi
+  rm -f "$pidfile"
+  echo off
+}
+
+case "${1:-status}" in
+  start) start_capture ;;
+  stop|off) stop_capture ;;
+  toggle) if running; then stop_capture; else start_capture; fi ;;
+  status) if running; then echo conversation; else echo off; fi ;;
+  *) echo "usage: $0 {start|stop|toggle|status}" >&2; exit 2 ;;
+esac

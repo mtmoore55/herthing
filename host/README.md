@@ -88,5 +88,8 @@ curl -X POST http://172.16.42.1:8787/api/state \
 ```
 
 The service starts with microphone mode `off` and does not open an audio
-device. It deliberately rejects voice and integration commands until their
-adapters are implemented.
+device. The development microphone bridge accepts memory-only S32 LE PCM at
+`POST /api/microphone/stream`. Physical knob events ask the device-local
+control service to toggle conversation capture; preset 4 always requests OFF.
+A closed, failed, or disconnected stream publishes OFF from a `finally` block.
+STT and assistant adapters are not connected yet.

@@ -1,4 +1,4 @@
-export function createPcmEnergyAnalyzer({ sampleBytes = 4, reference = 32768 } = {}) {
+export function createPcmEnergyAnalyzer({ sampleBytes = 4, reference = 2147483648 } = {}) {
   let remainder = new Uint8Array(0)
 
   return {

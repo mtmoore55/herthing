@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/bin/busybox httpd -f -p 172.16.42.2:8790 -h /var/local/herthing/microphone/www

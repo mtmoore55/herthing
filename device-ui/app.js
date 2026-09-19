@@ -253,8 +253,7 @@
     if (code === 'Digit1' || code === 'Escape') setView('home')
     if (code === 'Digit2') setView('spotify')
     if (code === 'Digit3') setView('calendar')
-    if (code === 'Digit4') showToast('MIC CONTROL · PHASE 4')
-    if (code === 'Enter') showToast('VOICE · PHASE 4')
+    if (code === 'Digit4') showToast('MIC OFF')
   }, true)
 
   window.addEventListener('pointerdown', function (event) {

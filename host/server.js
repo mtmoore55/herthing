@@ -7,6 +7,7 @@ import { createPcmEnergyAnalyzer } from './microphone-audio.js'
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
 const port = Number(process.env.HERTHING_PORT || 8787)
+const deviceControlUrl = process.env.HERTHING_DEVICE_CONTROL_URL || 'http://172.16.42.2:8790/cgi-bin/microphone'
 const clients = new Set()
 let microphoneStreamActive = false
 
@@ -82,6 +83,16 @@ function sameValue(left, right) {
 function refreshNowPlaying() {
   const nowPlaying = readNowPlaying()
   if (!sameValue(nowPlaying, state.now_playing)) mergeState({ now_playing: nowPlaying })
+}
+
+async function controlMicrophone(action) {
+  const response = await fetch(`${deviceControlUrl}?action=${encodeURIComponent(action)}`, {
+    signal: AbortSignal.timeout(2500)
+  })
+  if (!response.ok) throw new Error(`device microphone control returned ${response.status}`)
+  const result = await response.json()
+  if (!result.ok) throw new Error(result.error || 'device microphone control failed')
+  return result
 }
 
 const configuredWeather = weatherConfig()
@@ -201,6 +212,13 @@ const server = Bun.serve({
           } catch (error) {
             console.error('[volume] update failed:', error.message || error)
           }
+        }
+        if (message.input === 'knob_press' || message.input === 'preset_4') {
+          const action = message.input === 'knob_press' ? 'toggle' : 'off'
+          controlMicrophone(action).catch((error) => {
+            console.error('[microphone] control failed:', error.message || error)
+            mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0 } })
+          })
         }
         send(ws, envelope('ack', { reply_to: message.id }))
         return

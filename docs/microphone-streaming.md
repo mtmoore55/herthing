@@ -14,22 +14,23 @@ to the Omarchy host over its dedicated USB Ethernet link.
   host-owned microphone state to `off` in a `finally` block
 - Concurrency: a second capture is rejected while one stream owns the input
 
-The September 19 physical proof moved 655,360 bytes during a ten-second live
-capture and drove listening-state and energy updates over the existing display
-protocol. A separate temporary recording was intelligible after roughly 24 dB
-of digital gain. Native capture
+The September 19 transport proof moved 655,360 bytes during a ten-second
+memory-only capture. That first `curl --data-binary @-` probe buffered input
+until EOF, proving transport and analysis but not live delivery. The supervised
+device service therefore uses `curl --upload-file -`, which sends a chunked
+request as PCM arrives. A separate temporary recording was intelligible after
+roughly 24 dB of digital gain. Native capture
 measured approximately -55 dBFS RMS overall with peaks near -31 dBFS; an earlier
 quiet-room baseline was approximately -70 dBFS.
 
 ## Energy normalization
 
-The capture driver labels samples as S32 LE, but the useful signal occupies an
-approximately 16-bit range. The host therefore normalizes samples against
-32768. It maps the observed -75 to -45 dBFS range onto `0..1`, preserving a
-small amount of ambient motion while putting conversational speech in the
-middle of the visual range. This mapping is deliberately isolated from the
-renderer so later automatic gain control or a refined device capture stack can
-replace it.
+The capture driver supplies signed 32-bit little-endian samples, normalized
+against `2³¹`. The host maps the observed -75 to -45 dBFS range onto `0..1`,
+preserving a small amount of ambient motion while putting conversational speech
+in the middle of the visual range. This mapping is deliberately isolated from
+the renderer so later automatic gain control or a refined device capture stack
+can replace it.
 
 ## Privacy invariant
 
@@ -38,9 +39,22 @@ request and no open capture process. A future persistent device daemon must
 keep the same invariant: stop and reap capture, close ALSA, discard pre-roll,
 and publish OFF before presenting the state visually.
 
-## Next implementation
+## Development device service
 
-Replace the temporary `tinycap | curl` proof with a small supervised device
-service that owns ALSA and the microphone state machine. Knob press should open
-a conversation stream; preset 4 should provide a global OFF override. The same
-PCM stream can then fan out in host memory to energy analysis, VAD, and STT.
+`device/microphone/` now contains the small supervised service that owns ALSA
+and the microphone state machine. Its local CGI control surface is reachable
+only over the dedicated device link. Knob press toggles a conversation stream;
+preset 4 provides a global OFF override. Capture uses a chunked upload, and the
+same PCM stream fans out in host memory to energy analysis today and VAD/STT
+next.
+
+On the current development image, the service files and capture helper live on
+the writable `/var/local/herthing` partition. A standalone `runsv` process
+supervises them because this image's active runit directory is read-only. The
+service therefore survives UI/host restarts but must be registered again after
+a full Car Thing reboot. The next firmware build will install the service and
+its tinyalsa dependency into the image so normal boot owns this lifecycle.
+
+Steady quiet-room input measured approximately -69 dBFS and maps to about 0.19
+visual energy. The ALSA stream can produce a short startup transient; renderer
+smoothing prevents that single frame from becoming a privacy-state transition.

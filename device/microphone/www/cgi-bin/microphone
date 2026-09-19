@@ -1,0 +1,11 @@
+#!/bin/sh
+echo 'Content-Type: application/json'
+echo 'Cache-Control: no-store'
+echo
+action=${QUERY_STRING#action=}
+case "$action" in
+  start|stop|off|toggle|status) ;;
+  *) printf '{"error":"invalid action"}\n'; exit 0 ;;
+esac
+state=$(/var/local/herthing/microphone/mic-control "$action")
+printf '{"ok":true,"state":"%s"}\n' "$state"
