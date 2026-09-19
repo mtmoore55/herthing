@@ -35,11 +35,36 @@ Append `?demo=` to the device UI URL. Supported useful values include:
 
 These modes never connect to the host and do not alter real integrations.
 
-For visual development, append `?debug=1`. The Scene Lab can force dormant,
+For visual development, append `?debug=1`. The Visual Workbench can force dormant,
 event-at-180/60/30/10/now, music, track transition, user speech, assistant
 speech, combined music/conversation, imminent-event, and mic-off scenes. It
 also exposes continuous event-minutes and voice-energy sliders plus three test
-palettes. The lab exists only when explicitly requested by the query string.
+palettes.
+
+From the repository, run:
+
+```sh
+cd device-ui
+python -m http.server 8790 --bind 127.0.0.1
+```
+
+Then open `http://127.0.0.1:8790/?debug=1` in an 800×480 browser viewport.
+The production display never loads the workbench unless this query parameter is
+present.
+
+Workbench controls include:
+
+- a compact scenario gallery and full scenario picker;
+- continuous event-minutes, user-energy, and assistant-energy controls;
+- pause, 0.1×/0.5×/1×/2× study speeds, and motion-intensity control;
+- live renderer FPS and palette-transition triggers;
+- two browser-local A/B slots and portable JSON preset export;
+- `CLEAN VIEW`, with the `D` key restoring or hiding the controls.
+
+Use the A/B slots for comparisons during one browser session. Export JSON for
+design decisions worth sharing or preserving in the repository. A preset
+contains scene inputs and the exact target palette, but never personal live
+calendar or Spotify data.
 
 ## Attention model
 

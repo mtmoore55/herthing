@@ -283,11 +283,21 @@
   function buildDebugLab() {
     var userOverride = null
     var assistantOverride = null
+    var paused = false
     var lab = document.createElement('div')
     lab.className = 'debug-lab'
-    lab.innerHTML = '<strong>HERTHING SCENE LAB</strong><label>Scenario</label><select id="debug-scenario"><option>dormant</option><option>event-180</option><option>event-60</option><option>event-30</option><option>event-10</option><option>event-now</option><option>music</option><option>track-transition</option><option>user</option><option>assistant</option><option>music-user</option><option>music-assistant</option><option>imminent-music</option><option>imminent-conversation</option><option>off</option></select><label>Minutes until event <b id="debug-minutes-value">180</b></label><input id="debug-minutes" type="range" min="-10" max="180" value="180"><label>User energy</label><input id="debug-user" type="range" min="0" max="100" value="0"><label>Assistant energy</label><input id="debug-assistant" type="range" min="0" max="100" value="0"><button data-palette="ember">EMBER</button><button data-palette="marine">MARINE</button><button data-palette="acid">ACID</button>'
+    lab.innerHTML = '<header><strong>HERTHING VISUAL WORKBENCH</strong><span id="debug-fps">-- FPS</span></header><label>Scenario</label><select id="debug-scenario"><option>dormant</option><option>event-180</option><option>event-60</option><option>event-30</option><option>event-10</option><option>event-now</option><option>music</option><option>track-transition</option><option>user</option><option>assistant</option><option>music-user</option><option>music-assistant</option><option>imminent-music</option><option>imminent-conversation</option><option>off</option></select><div class="debug-gallery"><button data-scene="dormant">REST</button><button data-scene="music">MUSIC</button><button data-scene="music-user">YOU</button><button data-scene="music-assistant">HERTHING</button><button data-scene="event-10">10 MIN</button><button data-scene="off">MIC OFF</button></div><label>Minutes until event <b id="debug-minutes-value">180</b></label><input id="debug-minutes" type="range" min="-10" max="180" value="180"><label>User energy <b id="debug-user-value">0</b></label><input id="debug-user" type="range" min="0" max="100" value="0"><label>Assistant energy <b id="debug-assistant-value">0</b></label><input id="debug-assistant" type="range" min="0" max="100" value="0"><label>Motion intensity <b id="debug-intensity-value">100%</b></label><input id="debug-intensity" type="range" min="0" max="200" value="100"><label>Motion speed</label><select id="debug-speed"><option value=".1">0.1× study</option><option value=".5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select><div class="debug-actions"><button id="debug-pause">PAUSE</button><button id="debug-clean">CLEAN VIEW</button></div><label>Test palette / transition</label><div class="debug-actions"><button data-palette="ember">EMBER</button><button data-palette="marine">MARINE</button><button data-palette="acid">ACID</button></div><label>Compare / share</label><div class="debug-actions"><button data-save="a">SAVE A</button><button data-load="a">LOAD A</button><button data-save="b">SAVE B</button><button data-load="b">LOAD B</button><button id="debug-export">EXPORT JSON</button></div><small>Press D to show/hide this panel.</small>'
     document.body.appendChild(lab)
     var palettes = { ember: [[68,23,16],[190,72,34],[91,28,55],[220,145,70]], marine: [[8,37,48],[23,105,117],[30,53,91],[111,166,153]], acid: [[27,34,18],[145,183,38],[184,73,28],[66,36,94]] }
+    function settings() { return { scenario:$('debug-scenario').value, minutes:Number($('debug-minutes').value), userEnergy:Number($('debug-user').value), assistantEnergy:Number($('debug-assistant').value), intensity:Number($('debug-intensity').value), speed:Number($('debug-speed').value), paused:paused } }
+    function applySettings(value) {
+      if (!value) return
+      $('debug-scenario').value = value.scenario || 'dormant'; $('debug-minutes').value = value.minutes == null ? 180 : value.minutes
+      $('debug-user').value = value.userEnergy || 0; $('debug-assistant').value = value.assistantEnergy || 0
+      $('debug-intensity').value = value.intensity == null ? 100 : value.intensity; $('debug-speed').value = String(value.speed || 1)
+      paused = !!value.paused; userOverride = Number($('debug-user').value) / 100; assistantOverride = Number($('debug-assistant').value) / 100
+      update()
+    }
     function update(event) {
       if (event && event.target.id === 'debug-scenario') { userOverride = null; assistantOverride = null; $('debug-user').value = 0; $('debug-assistant').value = 0 }
       if (event && event.target.id === 'debug-user') userOverride = Number(event.target.value) / 100
@@ -298,6 +308,9 @@
       if (eventPreset) { minutes = Number(eventPreset[1]); $('debug-minutes').value = minutes }
       if (scenario === 'event-now') { minutes = 0; $('debug-minutes').value = 0 }
       $('debug-minutes-value').textContent = String(minutes)
+      $('debug-user-value').textContent = $('debug-user').value
+      $('debug-assistant-value').textContent = $('debug-assistant').value
+      $('debug-intensity-value').textContent = $('debug-intensity').value + '%'
       enableDemo(scenario === 'dormant' ? 'ambient' : scenario, minutes)
       if (scenario.indexOf('imminent') === 0) state.next_event.starts_at = new Date(Date.now() + 10 * 60000).toISOString()
       if (scenario === 'imminent-music') state.now_playing = { track:'Antidote', artist:'Travis Scott', duration_ms:252000, position_ms:91000, playing:true }
@@ -308,10 +321,26 @@
       }
       if (userOverride !== null) state.microphone.user_energy = userOverride
       if (assistantOverride !== null) state.microphone.assistant_energy = assistantOverride
+      if (window.HerThingVisuals) window.HerThingVisuals.setTuning({ paused:paused, speed:Number($('debug-speed').value), intensity:Number($('debug-intensity').value)/100 })
+      $('debug-pause').textContent = paused ? 'PLAY' : 'PAUSE'
       render()
     }
     lab.addEventListener('input', update)
-    lab.addEventListener('click', function (event) { var name=event.target.dataset.palette;if(name&&window.HerThingVisuals)window.HerThingVisuals.setPalette(palettes[name]) })
+    lab.addEventListener('click', function (event) {
+      var name=event.target.dataset.palette
+      if(name&&window.HerThingVisuals)window.HerThingVisuals.setPalette(palettes[name])
+      if(event.target.dataset.scene){$('debug-scenario').value=event.target.dataset.scene;update({target:$('debug-scenario')})}
+      if(event.target.id==='debug-pause'){paused=!paused;update()}
+      if(event.target.id==='debug-clean')lab.classList.add('hidden-lab')
+      if(event.target.dataset.save)localStorage.setItem('herthing-workbench-'+event.target.dataset.save,JSON.stringify(settings()))
+      if(event.target.dataset.load)applySettings(JSON.parse(localStorage.getItem('herthing-workbench-'+event.target.dataset.load)||'null'))
+      if(event.target.id==='debug-export'){
+        var blob=new Blob([JSON.stringify({herthingVisualPreset:1,settings:settings(),visuals:window.HerThingVisuals&&window.HerThingVisuals.getDebugState()},null,2)],{type:'application/json'})
+        var link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='herthing-visual-preset.json';link.click();setTimeout(function(){URL.revokeObjectURL(link.href)},1000)
+      }
+    })
+    window.addEventListener('keydown',function(event){if((event.key||'').toLowerCase()==='d')lab.classList.toggle('hidden-lab')})
+    setInterval(function(){var metrics=window.HerThingVisuals&&window.HerThingVisuals.getDebugState();$('debug-fps').textContent=metrics?metrics.fps+' FPS':'-- FPS'},1000)
     update()
   }
 

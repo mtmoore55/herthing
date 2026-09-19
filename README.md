@@ -134,3 +134,7 @@ real shed audio before committing to local-only transcription.
   continuous Canvas visual field: calm ambient typography, album-derived
   generative color, morphing track transitions, composable user/assistant voice
   energy inputs, and an always-visible three-state privacy indicator.
+- **2026-09-18:** Added an opt-in 800×480 visual workbench with fixed scene
+  scenarios, slow-motion and pause controls, live performance feedback,
+  palette transitions, A/B slots, and portable design presets. See
+  [`docs/visual-system.md`](docs/visual-system.md).
