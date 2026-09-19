@@ -3,6 +3,7 @@ import { calendarConfig, fetchNextEvent } from './calendar.js'
 import { executeMediaCommand, readNowPlaying } from './media-player.js'
 import { setSystemVolume } from './system-volume.js'
 import { createPcmEnergyAnalyzer } from './microphone-audio.js'
+import { transcribeS32le } from './stt-whisper.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
@@ -152,12 +153,15 @@ const server = Bun.serve({
       let lastBroadcast = 0
       let loudestDb = -120
       let peakEnergy = 0
-      mergeState({ microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 } })
+      const audioChunks = []
+      mergeState({ microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 }, transcript: null })
       try {
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
           bytes += value.byteLength
+          if (bytes > 16000 * 4 * 60) throw new Error('microphone stream exceeded 60 second safety limit')
+          audioChunks.push(value.slice())
           const measurement = analyzer.analyze(value)
           loudestDb = Math.max(loudestDb, measurement.db)
           peakEnergy = Math.max(peakEnergy, measurement.energy)
@@ -172,7 +176,18 @@ const server = Bun.serve({
             } })
           }
         }
-        return Response.json({ ok: true, bytes, loudest_db: Number(loudestDb.toFixed(1)), peak_energy: Number(peakEnergy.toFixed(3)) })
+        let transcription = null
+        if (bytes >= 16000 * 4 * 0.4) {
+          mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
+          try {
+            transcription = await transcribeS32le(Buffer.concat(audioChunks.map((chunk) => Buffer.from(chunk))))
+            mergeState({ transcript: transcription.text || null })
+            console.log(`[stt] ${transcription.elapsed_ms} ms: ${transcription.text}`)
+          } catch (error) {
+            console.error('[stt] transcription failed:', error.message || error)
+          }
+        }
+        return Response.json({ ok: true, bytes, loudest_db: Number(loudestDb.toFixed(1)), peak_energy: Number(peakEnergy.toFixed(3)), transcription })
       } finally {
         microphoneStreamActive = false
         mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0 } })

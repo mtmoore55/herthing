@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-09-18",
+  "updated": "2026-09-19",
   "components": {
     "mira-release": {
       "version": "1.2.1",
@@ -22,6 +22,12 @@
       "version": "0.6.0",
       "repository": "https://github.com/JoeyEamigh/flashthing.git",
       "commit": "80146130826532482d703d8f351fb2aede0bf54a"
+    },
+    "whisper.cpp": {
+      "repository": "https://github.com/ggml-org/whisper.cpp.git",
+      "commit": "5670d5c0bbcb148feabef84400a07cfca9aa3b30",
+      "model": "tiny.en",
+      "modelSha1": "c78c86eb1a8faa21b369bcd33207cc90d64ae9df"
     }
   }
 }

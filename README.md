@@ -144,3 +144,8 @@ real shed audio before committing to local-only transcription.
   audio to disk, concurrent capture is rejected, and every stream exit forces
   the published privacy state back to `MIC OFF`. See
   [`docs/microphone-streaming.md`](docs/microphone-streaming.md).
+- **2026-09-19:** Completed the first physical knob-to-transcript loop with a
+  pinned local whisper.cpp adapter and RAM-only utterance files. Accuracy was
+  usable but speech-end latency measured 4.6 seconds on the shed host, so this
+  is a functional baseline rather than the final conversational STT path. See
+  [`docs/speech-to-text.md`](docs/speech-to-text.md).

@@ -205,10 +205,13 @@
 
   function renderResponse() {
     var response = state.assistant_response
+    var transcript = state.transcript
     var element = $('assistant-response')
-    if (!response || response === lastResponse) return
-    lastResponse = response
-    element.textContent = typeof response === 'string' ? response : ''
+    var value = response || transcript
+    var key = response ? 'assistant:' + response : transcript ? 'user:' + transcript : ''
+    if (!value || key === lastResponse) return
+    lastResponse = key
+    element.textContent = response ? value : '“' + value + '”'
     element.classList.add('visible')
     clearTimeout(responseTimer)
     responseTimer = setTimeout(function () { element.classList.remove('visible') }, 6500)
