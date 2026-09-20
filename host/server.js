@@ -242,7 +242,15 @@ const server = Bun.serve({
       activeMicrophoneStream = streamId
       const ambientStream = !conversationActive
       const analyzer = createPcmEnergyAnalyzer()
-      const endpointDetector = createSpeechEndpointDetector()
+      // The device capture path has a short repeatable startup transient. In
+      // ambient mode, ignore more of that edge and require a clearer signal;
+      // active conversation keeps the more sensitive endpointing profile.
+      const endpointDetector = createSpeechEndpointDetector(ambientStream ? {
+        startupDelayMs: 950,
+        minimumSpeechMs: 400,
+        speechDb: -58,
+        silenceDb: -61
+      } : {})
       const reader = request.body.getReader()
       let bytes = 0
       let lastBroadcast = 0
@@ -308,6 +316,11 @@ const server = Bun.serve({
               console.log(`[wake] Ziggy${spokenRequest ? `: ${spokenRequest}` : ''}`)
               beginConversation()
               mergeState({ transcript: spokenRequest || 'Ziggy', microphone: { mode: 'conversation', activity: spokenRequest ? 'thinking' : 'idle', user_energy: 0 } })
+              if (!spokenRequest) {
+                mergeState({ assistant_response: 'Yes?', microphone: { mode: 'conversation', activity: 'speaking', user_energy: 0, assistant_energy: 0.32 } })
+                const acknowledgement = await speak('Yes?')
+                console.log(`[wake] acknowledgement first audio ${acknowledgement.first_audio_ms ?? 'unknown'} ms`)
+              }
             } else if (!ambientStream) {
               mergeState({ transcript: transcription.text || null })
             }

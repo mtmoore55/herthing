@@ -45,6 +45,10 @@ discarded unless they begin with `Ziggy` (optionally `Hey Ziggy`). A wake phrase
 may include its request in the same utterance. Nothing is sent to Muse merely
 because room speech was detected.
 
+A wake-only “Ziggy” receives a short “Yes?” acknowledgement before follow-up
+capture opens. The user should continue speaking without pressing the knob;
+pressing the knob during an open conversation intentionally closes it.
+
 During conversation, short complete phrases such as “Okay, that's it,” “Okay,
 thank you,” “Thanks Ziggy,” and “Goodnight Ziggy” close the session locally.
 They are intentionally anchored as complete utterances so “thank you, but…” is
