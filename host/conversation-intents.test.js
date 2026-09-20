@@ -5,6 +5,7 @@ describe('ambient wake phrase', () => {
   test('recognizes Ziggy and extracts an optional request', () => {
     expect(extractWakeCommand('Ziggy')).toEqual({ command: '' })
     expect(extractWakeCommand('Hey, Ziggy!')).toEqual({ command: '' })
+    expect(extractWakeCommand('Ziggy Ziggy')).toEqual({ command: '' })
     expect(extractWakeCommand("Ziggy, what's my next meeting?")).toEqual({ command: 'whats my next meeting' })
   })
   test('does not wake when Ziggy is merely mentioned later', () => {

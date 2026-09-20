@@ -9,6 +9,7 @@ describe('Whisper transcript normalization', () => {
     expect(normalizeTranscript('[applause]')).toBe('')
     expect(normalizeTranscript('[laughs]')).toBe('')
     expect(normalizeTranscript('(music)')).toBe('')
+    expect(normalizeTranscript('Ziggy Ziggy [BLANK_AUDIO]')).toBe('Ziggy Ziggy')
   })
 
   test('normalizes spoken whitespace', () => {

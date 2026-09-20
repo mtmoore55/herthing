@@ -4,7 +4,9 @@ function spokenWords(value) {
 
 export function extractWakeCommand(value) {
   const match = spokenWords(value).match(/^(?:(?:hey|hi|okay|ok)\s+)?ziggy(?:\s+(.*))?$/)
-  return match ? { command: (match[1] || '').trim() } : null
+  if (!match) return null
+  const command = (match[1] || '').replace(/^(?:ziggy\s*)+/, '').trim()
+  return { command }
 }
 
 export function isSleepIntent(value) {

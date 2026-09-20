@@ -247,9 +247,10 @@ const server = Bun.serve({
       // active conversation keeps the more sensitive endpointing profile.
       const endpointDetector = createSpeechEndpointDetector(ambientStream ? {
         startupDelayMs: 950,
-        minimumSpeechMs: 400,
-        speechDb: -58,
-        silenceDb: -61
+        minimumSpeechMs: 300,
+        speechDb: -63,
+        silenceDb: -58,
+        trailingSilenceMs: 750
       } : {})
       const reader = request.body.getReader()
       let bytes = 0

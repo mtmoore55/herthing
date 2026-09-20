@@ -246,7 +246,13 @@
     element.textContent = response ? value : '“' + value + '”'
     element.classList.add('visible')
     clearTimeout(responseTimer)
-    responseTimer = setTimeout(function () { element.classList.remove('visible') }, 6500)
+    // Assistant language should remain long enough to read comfortably, even
+    // after a short spoken response finishes. User transcripts are briefer.
+    var words = String(value).trim().split(/\s+/).filter(Boolean).length
+    var visibleMs = response
+      ? Math.max(12000, Math.min(30000, 4000 + words * 360))
+      : Math.max(5500, Math.min(12000, 2500 + words * 300))
+    responseTimer = setTimeout(function () { element.classList.remove('visible') }, visibleMs)
   }
 
   function render() { renderWeather(); renderEvent(); renderAgenda(); renderTrack(); renderMicrophone(); renderResponse(); renderAttention(new Date(Date.now() + hostClockSkewMs)) }

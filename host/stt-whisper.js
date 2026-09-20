@@ -7,10 +7,12 @@ const defaultServerUrl = 'http://127.0.0.1:8792/inference'
 const domainPrompt = 'HerThing is a voice assistant. Requests may mention Spotify, calendars, weather, meetings, reminders, and music.'
 
 export function normalizeTranscript(value) {
-  const text = String(value || '').trim().replace(/\s+/g, ' ')
+  const text = String(value || '')
+    .replace(/\[[^\]]+\]|\([^\)]+\)/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
   // Whisper emits ambient sound captions as bracketed or parenthesized text.
   // They are observations, not user utterances, and must never reach an agent.
-  if (/^(?:\[[^\]]+\]|\([^\)]+\))$/i.test(text)) return ''
   return text
 }
 
