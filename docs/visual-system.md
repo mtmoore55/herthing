@@ -140,11 +140,13 @@ history. Microphone status lives outside this hierarchy and never disappears.
 
 ## Performance
 
-The scene renders internally at 160x96 and scales to 800x480. Scene evolution
-runs at 12 Hz because motion is deliberately slow and the
-Car Thing's legacy Chromium software compositor remains CPU-heavy regardless of
-Canvas paint frequency. Voice-to-visual response remains below one scene frame
-(about 80 ms). Application state is never updated per animation frame. Design
-references live at `docs/design/ambient-grid-v1.png` and
+The behavioral field remains a small 40×24 logical grid. Each frame uploads its
+3.75 KiB RGBA field as a texture; a minimal WebGL shader lets Car Thing's
+Mali-G31 scale and present it at 800×480. Canvas 2D remains an automatic fallback.
+This avoids the legacy Chromium software compositor path, which measured roughly
+5 FPS with CSS filtering and redundant Canvas scaling. The physical device now
+holds 60 FPS, with voice-to-visual response below one display frame under normal
+load. Application state is never updated per animation frame. Design references
+live at `docs/design/ambient-grid-v1.png` and
 `docs/design/ambient-grid-v2.png`; v2 establishes direction rather than a
 pixel-perfect UI specification.
