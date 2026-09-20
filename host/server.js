@@ -5,14 +5,15 @@ import { setSystemVolume } from './system-volume.js'
 import { createPcmEnergyAnalyzer, createSpeechEndpointDetector } from './microphone-audio.js'
 import { transcribeS32le } from './stt-whisper.js'
 import { askAssistant, assistantConfig, resetAssistantConversation } from './assistant.js'
-import { speak, speechConfig } from './speech.js'
+import { museBrowserHealth } from './muse-browser.js'
+import { cancelSpeech, speak, speechConfig } from './speech.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
 const port = Number(process.env.HERTHING_PORT || 8787)
 const deviceControlUrl = process.env.HERTHING_DEVICE_CONTROL_URL || 'http://172.16.42.2:8790/cgi-bin/microphone'
 const clients = new Set()
-let microphoneStreamActive = false
+let activeMicrophoneStream = null
 const conversationTimeoutMs = Number(process.env.HERTHING_CONVERSATION_TIMEOUT_MS || 3 * 60 * 1000)
 const followupDelayMs = Number(process.env.HERTHING_FOLLOWUP_DELAY_MS || 800)
 const noSpeechCycleMs = Number(process.env.HERTHING_NO_SPEECH_CYCLE_MS || 15000)
@@ -112,6 +113,7 @@ function beginConversation() {
 
 function endConversation() {
   clearTimeout(followupTimer)
+  cancelSpeech()
   conversationGeneration += 1
   conversationActive = false
   conversationExpiresAt = 0
@@ -189,7 +191,10 @@ const server = Bun.serve({
     if (url.pathname === '/ws' && server.upgrade(request)) return
 
     if (url.pathname === '/health') {
-      return Response.json({ ok: true, protocol, revision, clients: clients.size })
+      const assistant = assistantConfig().provider === 'muse-browser'
+        ? { provider: 'muse-browser', ...(await museBrowserHealth()) }
+        : { provider: assistantConfig().provider, ok: true }
+      return Response.json({ ok: true, protocol, revision, clients: clients.size, assistant })
     }
 
     if (url.pathname === '/api/state' && request.method === 'GET') {
@@ -207,8 +212,9 @@ const server = Bun.serve({
 
     if (url.pathname === '/api/microphone/stream' && request.method === 'POST') {
       if (!request.body) return Response.json({ error: 'PCM request body required' }, { status: 400 })
-      if (microphoneStreamActive) return Response.json({ error: 'microphone stream already active' }, { status: 409 })
-      microphoneStreamActive = true
+      if (activeMicrophoneStream) return Response.json({ error: 'microphone stream already active' }, { status: 409 })
+      const streamId = crypto.randomUUID()
+      activeMicrophoneStream = streamId
       const analyzer = createPcmEnergyAnalyzer()
       const endpointDetector = createSpeechEndpointDetector()
       const reader = request.body.getReader()
@@ -260,16 +266,19 @@ const server = Bun.serve({
             } })
           }
         }
+        // Only the PCM upload is mutually exclusive. Release the stream slot
+        // before STT/agent/TTS so an explicit interruption can begin capture.
+        if (activeMicrophoneStream === streamId) activeMicrophoneStream = null
         let transcription = null
         let assistant = null
         if (!noSpeechTimeout && speechDetected && bytes >= 16000 * 4 * 0.4) {
-          extendConversation()
           mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
           try {
             transcription = await transcribeS32le(Buffer.concat(audioChunks.map((chunk) => Buffer.from(chunk))))
             mergeState({ transcript: transcription.text || null })
             console.log(`[stt] ${transcription.elapsed_ms} ms: ${transcription.text}`)
             if (transcription.text) {
+              extendConversation()
               assistant = await askAssistant(transcription.text, state)
               if (conversationActive) {
                 mergeState({
@@ -278,7 +287,7 @@ const server = Bun.serve({
                 })
                 console.log(`[assistant:${assistant.provider}] ${assistant.elapsed_ms} ms: ${assistant.text}`)
                 const speech = await speak(assistant.text)
-                console.log(`[tts] first audio ${speech.first_audio_ms ?? 'unknown'} ms; complete ${speech.elapsed_ms} ms${speech.skipped ? ' (disabled)' : ''}`)
+                console.log(`[tts] first audio ${speech.first_audio_ms ?? 'unknown'} ms; complete ${speech.elapsed_ms} ms${speech.skipped ? ' (disabled)' : speech.cancelled ? ' (cancelled)' : ''}`)
               } else {
                 console.log('[conversation] response discarded after session ended')
               }
@@ -289,11 +298,11 @@ const server = Bun.serve({
         }
         return Response.json({ ok: true, bytes, loudest_db: Number(loudestDb.toFixed(1)), peak_energy: Number(peakEnergy.toFixed(3)), transcription, assistant })
       } finally {
-        microphoneStreamActive = false
-        if (conversationActive) {
+        if (activeMicrophoneStream === streamId) activeMicrophoneStream = null
+        if (conversationActive && !activeMicrophoneStream) {
           mergeState({ microphone: { mode: 'conversation', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
           scheduleFollowup()
-        } else {
+        } else if (!conversationActive) {
           mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
         }
       }
@@ -334,6 +343,21 @@ const server = Bun.serve({
           }
         }
         if (message.input === 'knob_press' || message.input === 'preset_4') {
+          if (message.input === 'knob_press' && conversationActive && state.microphone.activity === 'speaking') {
+            const cancelled = cancelSpeech()
+            extendConversation()
+            mergeState({
+              microphone: { mode: 'conversation', activity: 'listening', user_energy: 0, assistant_energy: 0 },
+              assistant_response: null
+            })
+            controlMicrophone('start').catch((error) => {
+              console.error('[barge-in] capture failed:', error.message || error)
+              endConversation()
+            })
+            console.log(`[barge-in] knob interruption${cancelled ? '' : ' (no active playback)'}`)
+            send(ws, envelope('ack', { reply_to: message.id }))
+            return
+          }
           const exiting = message.input === 'preset_4' || conversationActive
           const action = exiting ? 'off' : 'start'
           if (exiting) endConversation()

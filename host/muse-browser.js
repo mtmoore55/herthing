@@ -11,13 +11,30 @@ function visibleText(value) {
 export function museBrowserConfig() {
   return {
     debugUrl: process.env.HERTHING_MUSE_BROWSER_DEBUG_URL || defaultDebugUrl,
+    chatUrl: process.env.HERTHING_MUSE_BROWSER_CHAT_URL || null,
     timeoutMs: Number(process.env.HERTHING_MUSE_BROWSER_TIMEOUT_MS || 90000),
     settleMs: Number(process.env.HERTHING_MUSE_BROWSER_SETTLE_MS || 900)
   }
 }
 
-export function chooseMuseTarget(targets) {
+export function chooseMuseTarget(targets, chatUrl = null) {
+  if (chatUrl) {
+    return targets.find((target) => target.type === 'page' && target.url === chatUrl)
+  }
   return targets.find((target) => target.type === 'page' && /^https:\/\/(?:www\.)?muse\.ai(?:\/|$)/.test(target.url))
+}
+
+export async function museBrowserHealth(config = museBrowserConfig()) {
+  try {
+    const response = await fetch(`${config.debugUrl}/json`, { signal: AbortSignal.timeout(3000) })
+    if (!response.ok) return { ok: false, reason: `debugger returned ${response.status}` }
+    const target = chooseMuseTarget(await response.json(), config.chatUrl)
+    return target
+      ? { ok: true, title: target.title || null, url: target.url }
+      : { ok: false, reason: 'Muse page not found' }
+  } catch (error) {
+    return { ok: false, reason: error.message || String(error) }
+  }
 }
 
 class CdpSession {
@@ -130,13 +147,15 @@ export class MuseBrowserClient {
   }
 
   async ask(text) {
-    const target = chooseMuseTarget(await this.targets())
-    if (!target?.webSocketDebuggerUrl) {
-      throw new Error('Dedicated Muse browser is not open. Start it with scripts/start-muse-browser.sh')
-    }
-    const cdp = new CdpSession(target.webSocketDebuggerUrl)
-    await cdp.connect()
+    let submitted = false
+    let cdp = null
     try {
+      const target = chooseMuseTarget(await this.targets(), this.config.chatUrl)
+      if (!target?.webSocketDebuggerUrl) {
+        throw new Error('Dedicated Muse browser is not open. Start it with scripts/start-muse-browser.sh')
+      }
+      cdp = new CdpSession(target.webSocketDebuggerUrl)
+      await cdp.connect()
       await cdp.send('Runtime.enable')
       const before = await cdp.evaluate(pageHelpers)
       if (!before?.ready) throw new Error('Muse is not signed in or its message composer is unavailable')
@@ -145,6 +164,7 @@ export class MuseBrowserClient {
       await cdp.send('Input.insertText', { text })
       await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
       await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+      submitted = true
 
       const deadline = Date.now() + this.config.timeoutMs
       let last = before.texts?.at(-1) || ''
@@ -163,8 +183,11 @@ export class MuseBrowserClient {
         if (stableSince && Date.now() - stableSince >= this.config.settleMs) return candidate
       }
       throw new Error('Timed out waiting for Muse to finish responding')
+    } catch (error) {
+      if (!submitted) error.code = 'MUSE_BROWSER_UNAVAILABLE'
+      throw error
     } finally {
-      cdp.close()
+      cdp?.close()
     }
   }
 }

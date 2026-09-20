@@ -8,7 +8,9 @@ const domainPrompt = 'HerThing is a voice assistant. Requests may mention Spotif
 
 export function normalizeTranscript(value) {
   const text = String(value || '').trim().replace(/\s+/g, ' ')
-  if (/^\[(blank_audio|no_speech|silence)\]$/i.test(text)) return ''
+  // Whisper emits ambient sound captions as bracketed or parenthesized text.
+  // They are observations, not user utterances, and must never reach an agent.
+  if (/^(?:\[[^\]]+\]|\([^\)]+\))$/i.test(text)) return ''
   return text
 }
 

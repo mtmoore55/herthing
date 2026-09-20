@@ -160,14 +160,21 @@ export function assistantConfig() {
 export async function askAssistant(text, context = {}) {
   const { provider } = assistantConfig()
   const started = performance.now()
-  const response = provider === 'meta'
-    ? await metaResponse(text, context)
-    : provider === 'muse'
-      ? await museResponse(text, context)
-      : provider === 'muse-browser'
-        ? await askMuseBrowser(museBrowserPrompt(text, context))
-        : localResponse(text, context)
-  return { text: response, provider, elapsed_ms: Math.round(performance.now() - started) }
+  let usedProvider = provider
+  let response
+  if (provider === 'meta') response = await metaResponse(text, context)
+  else if (provider === 'muse') response = await museResponse(text, context)
+  else if (provider === 'muse-browser') {
+    try {
+      response = await askMuseBrowser(museBrowserPrompt(text, context))
+    } catch (error) {
+      if (error.code !== 'MUSE_BROWSER_UNAVAILABLE') throw error
+      console.warn('[assistant:muse-browser] unavailable before submission; falling back to Meta Model API')
+      response = await metaResponse(text, context)
+      usedProvider = 'meta-fallback'
+    }
+  } else response = localResponse(text, context)
+  return { text: response, provider: usedProvider, elapsed_ms: Math.round(performance.now() - started) }
 }
 
 export { localResponse, parseMetaResponse, parseMuseJsonl }

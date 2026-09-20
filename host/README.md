@@ -141,11 +141,21 @@ dedicated Muse chat is ready, configure the host:
 ```ini
 HERTHING_ASSISTANT_PROVIDER=muse-browser
 HERTHING_MUSE_BROWSER_DEBUG_URL=http://127.0.0.1:9333
+HERTHING_MUSE_BROWSER_CHAT_URL=https://muse.ai/thread/your-dedicated-side-chat
 ```
+
+Set the matching `HERTHING_MUSE_BROWSER_URL` on the browser service so it opens
+that side chat after login or reboot. Treat the thread URL as private local
+configuration; do not commit it to a public repository.
 
 Keep the browser open while using this provider. It is intentionally an
 experimental adapter: upstream UI changes can break it. The direct `meta`
 provider remains available as the reliable low-latency fallback.
+
+`GET /health` reports whether the dedicated Muse page is reachable. If the
+browser is unavailable before a message is submitted, HerThing safely falls
+back to the direct Meta Model API. It does not retry after submission, because
+that could create duplicate turns.
 
 If Muse changes its markup, inspect only a known test response without dumping
 private conversation history:

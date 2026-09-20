@@ -5,6 +5,10 @@ describe('Whisper transcript normalization', () => {
   test('removes non-speech markers', () => {
     expect(normalizeTranscript('[BLANK_AUDIO]')).toBe('')
     expect(normalizeTranscript('[no_speech]')).toBe('')
+    expect(normalizeTranscript('[typing]')).toBe('')
+    expect(normalizeTranscript('[applause]')).toBe('')
+    expect(normalizeTranscript('[laughs]')).toBe('')
+    expect(normalizeTranscript('(music)')).toBe('')
   })
 
   test('normalizes spoken whitespace', () => {

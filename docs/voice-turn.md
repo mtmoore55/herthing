@@ -22,6 +22,17 @@ button press or wake word. Each real utterance extends the session; silent
 15-second capture windows are recycled in memory without transcription or
 storage until the session expires. Pressing the knob again, pressing preset 4,
 or reaching the inactivity deadline closes the session and publishes MIC OFF.
+VAD triggers alone do not extend the deadline; the normalized transcript must
+contain an actual utterance.
+
+Pressing the knob while HerThing is speaking is a safe manual barge-in: playback
+is cancelled immediately and capture reopens without closing the conversation.
+Voice-triggered full-duplex barge-in remains disabled until the audio path has
+echo cancellation; otherwise the shed speakers could interrupt themselves.
+
+Whisper ambient captions such as `[typing]`, `[applause]`, and `[laughs]` are
+discarded before the assistant boundary. They remain neither conversation turns
+nor stored raw audio.
 
 The Meta adapter carries `previous_response_id` across turns, so corrections,
 pronouns, and follow-ups share server-managed context without coupling the

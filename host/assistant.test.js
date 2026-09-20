@@ -28,6 +28,15 @@ describe('assistant adapters', () => {
     expect(target?.url).toBe('https://muse.ai/chat/ziggy')
   })
 
+  test('locks the browser bridge to a configured side chat', () => {
+    const targets = [
+      { type: 'page', url: 'https://muse.ai/' },
+      { type: 'page', url: 'https://muse.ai/thread/herthing' }
+    ]
+    expect(chooseMuseTarget(targets, 'https://muse.ai/thread/herthing')?.url)
+      .toBe('https://muse.ai/thread/herthing')
+  })
+
   test('relays browser turns without replacing the personal agent identity', () => {
     const prompt = museBrowserPrompt('What do you remember?', {})
     expect(prompt).toContain('Respond as Ziggy')
