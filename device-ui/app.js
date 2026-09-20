@@ -13,6 +13,7 @@
   var hostClockSkewMs = 0
   var eventUrgency = 0
   var visualHourOverride = null
+  var visualClockOverride = null
   var state = {
     clock: { utc_offset_minutes: 0 },
     weather: null,
@@ -106,6 +107,9 @@
     var weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
     var months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
     $('date').textContent = weekdays[wallClock.getUTCDay()] + ' · ' + months[wallClock.getUTCMonth()] + ' ' + wallClock.getUTCDate()
+    var clockHours = wallClock.getUTCHours() % 12 || 12
+    var gridClock = visualClockOverride || clockHours + ':' + String(wallClock.getUTCMinutes()).padStart(2, '0')
+    if (window.HerThingVisuals) window.HerThingVisuals.setClock(gridClock)
     if (window.HerThingVisuals) window.HerThingVisuals.setTimeOfDay(visualHourOverride == null ? wallClock.getUTCHours() + wallClock.getUTCMinutes() / 60 : visualHourOverride)
     renderEventRelative(now)
     renderAttention(now)
@@ -320,6 +324,8 @@
       state.now_playing = { track: 'Everything in Its Right Place', artist: 'Radiohead', album: 'Kid A', art_url: null, duration_ms: 251000, position_ms: 137000, playing: true }
     }
     if (mode.indexOf('user') >= 0) state.microphone = { mode: 'conversation', activity: 'listening', user_energy: .72 }
+    if (mode.indexOf('transcription') >= 0) { state.microphone = { mode: 'conversation', activity: 'thinking' }; state.transcript = 'what does tomorrow morning look like' }
+    if (mode.indexOf('thinking') >= 0) { state.microphone = { mode: 'conversation', activity: 'thinking' }; state.transcript = 'what does tomorrow morning look like' }
     if (mode.indexOf('assistant') >= 0) state.microphone = { mode: 'conversation', activity: 'speaking', assistant_energy: .72 }
     if (mode.indexOf('assistant') >= 0) state.assistant_response = 'You have twenty quiet minutes before your next meeting.'
     setConnection(true)
@@ -332,7 +338,14 @@
     var lab = document.createElement('div')
     lab.className = 'debug-lab'
     lab.innerHTML = '<header><strong>HERTHING VISUAL WORKBENCH</strong><span id="debug-fps">-- FPS</span></header><label>Scenario</label><select id="debug-scenario"><option>dormant</option><option>event-180</option><option>event-60</option><option>event-30</option><option>event-10</option><option>event-now</option><option>music</option><option>track-transition</option><option>user</option><option>assistant</option><option>music-user</option><option>music-assistant</option><option>imminent-music</option><option>imminent-conversation</option><option>off</option></select><div class="debug-gallery"><button data-scene="dormant">REST</button><button data-scene="music">MUSIC</button><button data-scene="music-user">YOU</button><button data-scene="music-assistant">HERTHING</button><button data-scene="event-10">10 MIN</button><button data-scene="off">MIC OFF</button></div><label>Minutes until event <b id="debug-minutes-value">180</b></label><input id="debug-minutes" type="range" min="-10" max="180" value="180"><label>User energy <b id="debug-user-value">0</b></label><input id="debug-user" type="range" min="0" max="100" value="0"><label>Assistant energy <b id="debug-assistant-value">0</b></label><input id="debug-assistant" type="range" min="0" max="100" value="0"><label>Motion intensity <b id="debug-intensity-value">100%</b></label><input id="debug-intensity" type="range" min="0" max="200" value="100"><label>Cell softness <b id="debug-softness-value">58%</b></label><input id="debug-softness" type="range" min="0" max="100" value="58"><label>Glow <b id="debug-glow-value">42%</b></label><input id="debug-glow" type="range" min="0" max="100" value="42"><label>Wave speed <b id="debug-wave-speed-value">100%</b></label><input id="debug-wave-speed" type="range" min="40" max="180" value="100"><label>Wave decay <b id="debug-wave-decay-value">90%</b></label><input id="debug-wave-decay" type="range" min="40" max="97" value="90"><label>Brightness <b id="debug-brightness-value">118%</b></label><input id="debug-brightness" type="range" min="35" max="160" value="118"><label>Motion speed</label><select id="debug-speed"><option value=".1">0.1× study</option><option value=".5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select><div class="debug-actions"><button id="debug-pause">PAUSE</button><button id="debug-clean">CLEAN VIEW</button></div><label>Test palette / transition</label><div class="debug-actions"><button data-palette="ember">EMBER</button><button data-palette="marine">MARINE</button><button data-palette="acid">ACID</button></div><label>Compare / share</label><div class="debug-actions"><button data-save="a">SAVE A</button><button data-load="a">LOAD A</button><button data-save="b">SAVE B</button><button data-load="b">LOAD B</button><button id="debug-export">EXPORT JSON</button></div><small>Press D to show/hide this panel.</small>'
+    lab.querySelector('header').insertAdjacentHTML('afterend','<label>Grid clock</label><div class="debug-actions"><input id="debug-clock" type="time" value="10:42"><button id="debug-minute">+1 MIN</button></div><label>Clock treatment</label><select id="debug-clock-style"><option>hybrid</option><option>void</option><option>force</option><option>calm</option></select><label>Grid density <b id="debug-density-value">40</b></label><input id="debug-density" type="range" min="28" max="52" value="40"><label>Grid energy <b id="debug-grid-energy-value">88%</b></label><input id="debug-grid-energy" type="range" min="30" max="140" value="88"><label>Clock void <b id="debug-clock-void-value">72%</b></label><input id="debug-clock-void" type="range" min="20" max="100" value="72"><label>Edge influence <b id="debug-edge-value">2%</b></label><input id="debug-edge" type="range" min="0" max="150" value="2"><label>Clock scale <b id="debug-clock-scale-value">82%</b></label><input id="debug-clock-scale" type="range" min="68" max="100" value="82">')
     document.body.appendChild(lab)
+    ;['no-calendar','transcription','thinking'].forEach(function (name) {
+      var option = document.createElement('option')
+      option.value = name
+      option.textContent = name
+      $('debug-scenario').appendChild(option)
+    })
     var palettes = { ember: [[68,23,16],[190,72,34],[91,28,55],[220,145,70]], marine: [[8,37,48],[23,105,117],[30,53,91],[111,166,153]], acid: [[27,34,18],[145,183,38],[184,73,28],[66,36,94]] }
     function settings() { return { scenario:$('debug-scenario').value, minutes:Number($('debug-minutes').value), userEnergy:Number($('debug-user').value), assistantEnergy:Number($('debug-assistant').value), intensity:Number($('debug-intensity').value), softness:Number($('debug-softness').value), glow:Number($('debug-glow').value), waveSpeed:Number($('debug-wave-speed').value), waveDecay:Number($('debug-wave-decay').value), brightness:Number($('debug-brightness').value), speed:Number($('debug-speed').value), paused:paused } }
     function applySettings(value) {
@@ -358,9 +371,11 @@
       $('debug-user-value').textContent = $('debug-user').value
       $('debug-assistant-value').textContent = $('debug-assistant').value
       $('debug-intensity-value').textContent = $('debug-intensity').value + '%'
+      $('debug-density-value').textContent = $('debug-density').value; $('debug-grid-energy-value').textContent = $('debug-grid-energy').value + '%'; $('debug-clock-void-value').textContent = $('debug-clock-void').value + '%'; $('debug-edge-value').textContent = $('debug-edge').value + '%'; $('debug-clock-scale-value').textContent = $('debug-clock-scale').value + '%'
       $('debug-softness-value').textContent = $('debug-softness').value + '%'; $('debug-glow-value').textContent = $('debug-glow').value + '%'
       $('debug-wave-speed-value').textContent = $('debug-wave-speed').value + '%'; $('debug-wave-decay-value').textContent = $('debug-wave-decay').value + '%'; $('debug-brightness-value').textContent = $('debug-brightness').value + '%'
       enableDemo(scenario === 'dormant' ? 'ambient' : scenario, minutes)
+      if (scenario === 'no-calendar') { state.next_event = null; state.today_events = [] }
       if (scenario.indexOf('imminent') === 0) state.next_event.starts_at = new Date(Date.now() + 10 * 60000).toISOString()
       if (scenario === 'imminent-music') state.now_playing = { track:'Antidote', artist:'Travis Scott', duration_ms:252000, position_ms:91000, playing:true }
       if (scenario === 'imminent-conversation') state.microphone = { mode:'conversation', activity:'listening', user_energy:.6 }
@@ -370,7 +385,8 @@
       }
       if (userOverride !== null) state.microphone.user_energy = userOverride
       if (assistantOverride !== null) state.microphone.assistant_energy = assistantOverride
-      if (window.HerThingVisuals) window.HerThingVisuals.setTuning({ paused:paused, speed:Number($('debug-speed').value), intensity:Number($('debug-intensity').value)/100, cellSoftness:Number($('debug-softness').value)/100, glow:Number($('debug-glow').value)/100, userWavePropagationSpeed:3.3*Number($('debug-wave-speed').value)/100, assistantWavePropagationSpeed:2.75*Number($('debug-wave-speed').value)/100, userWaveDecay:Number($('debug-wave-decay').value)/100, assistantWaveDecay:Number($('debug-wave-decay').value)/100, overallBrightness:Number($('debug-brightness').value)/100 })
+      visualClockOverride = $('debug-clock').value
+      if (window.HerThingVisuals) { window.HerThingVisuals.setClock(visualClockOverride); window.HerThingVisuals.setTuning({ paused:paused, speed:Number($('debug-speed').value), intensity:Number($('debug-intensity').value)/100, cellSoftness:Number($('debug-softness').value)/100, glow:Number($('debug-glow').value)/100, userWavePropagationSpeed:5.2*Number($('debug-wave-speed').value)/100, assistantWavePropagationSpeed:4.7*Number($('debug-wave-speed').value)/100, userWaveDecay:Number($('debug-wave-decay').value)/100, assistantWaveDecay:Number($('debug-wave-decay').value)/100, overallBrightness:Number($('debug-brightness').value)/100, clockStyle:$('debug-clock-style').value, columns:Number($('debug-density').value), rows:Math.round(Number($('debug-density').value)*.6), gridEnergy:Number($('debug-grid-energy').value)/100, clockVoidStrength:Number($('debug-clock-void').value)/100, clockBoundaryDisplacement:Number($('debug-edge').value)/100, clockScale:Number($('debug-clock-scale').value)/100 }) }
       $('debug-pause').textContent = paused ? 'PLAY' : 'PAUSE'
       render()
     }
@@ -380,6 +396,7 @@
       if(name&&window.HerThingVisuals)window.HerThingVisuals.setPalette(palettes[name])
       if(event.target.dataset.scene){$('debug-scenario').value=event.target.dataset.scene;update({target:$('debug-scenario')})}
       if(event.target.id==='debug-pause'){paused=!paused;update()}
+      if(event.target.id==='debug-minute'){var parts=$('debug-clock').value.split(':').map(Number),total=(parts[0]*60+parts[1]+1)%1440;$('debug-clock').value=String(Math.floor(total/60)).padStart(2,'0')+':'+String(total%60).padStart(2,'0');update()}
       if(event.target.id==='debug-clean')lab.classList.add('hidden-lab')
       if(event.target.dataset.save)localStorage.setItem('herthing-workbench-'+event.target.dataset.save,JSON.stringify(settings()))
       if(event.target.dataset.load)applySettings(JSON.parse(localStorage.getItem('herthing-workbench-'+event.target.dataset.load)||'null'))
@@ -397,6 +414,8 @@
   var demoMode = parameters.get('demo')
   var debugMode = parameters.get('debug') === '1'
   if (parameters.has('hour')) visualHourOverride = Math.max(0, Math.min(23.99, Number(parameters.get('hour')) || 0))
+  if (parameters.has('time')) visualClockOverride = parameters.get('time')
+  if (parameters.has('clockStyle') && window.HerThingVisuals) window.HerThingVisuals.setClockStyle(parameters.get('clockStyle'))
   if (demoMode) enableDemo(demoMode, parameters.get('minutes'))
   if (debugMode) enableDemo('ambient', 180)
   if (parameters.get('view')) dashboard.dataset.view = parameters.get('view')

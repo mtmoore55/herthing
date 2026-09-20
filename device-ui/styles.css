@@ -10,18 +10,19 @@
 #visual-field { position:absolute; z-index:-4; inset:0; width:100%; height:100%; image-rendering:pixelated; filter:saturate(1.08) blur(.35px); transform:scale(1.025); }
 .veil { position: absolute; z-index: -3; inset: 0; background: linear-gradient(90deg,rgba(7,7,6,.52),rgba(7,7,6,.08) 55%,rgba(7,7,6,.25)),linear-gradient(0deg,rgba(7,7,6,.48),transparent 48%); transition: opacity 1.8s ease; }
 .grain { position:absolute; z-index:-2; inset:-40%; opacity:.035; pointer-events:none; background-image:repeating-radial-gradient(circle at 19% 28%,transparent 0,rgba(255,255,255,.7) .55px,transparent 1.1px,transparent 4px); transform:rotate(8deg); }
-.topline { display:flex; align-items:flex-start; justify-content:space-between; opacity:var(--conditions-opacity); transform:translateY(calc(var(--event-shift) * -.18)); transition:opacity 1.2s ease,transform 1.8s cubic-bezier(.2,.7,.2,1); } .clock-wrap { display:flex; align-items:baseline; gap:15px; }
-#clock { font-family:CalDisplay,Arial,sans-serif; font-size:72px; line-height:.82; font-weight:500; letter-spacing:-.035em; word-spacing:.1em; font-variant-numeric:tabular-nums; text-shadow:0 2px 28px rgba(0,0,0,.3); }
-#date { color:rgba(242,239,232,.48); font-size:12px; font-weight:700; letter-spacing:.17em; }
+.topline { display:flex; align-items:flex-start; justify-content:space-between; opacity:var(--conditions-opacity); transform:translateY(calc(var(--event-shift) * -.18)); transition:opacity 1.2s ease,transform 1.8s cubic-bezier(.2,.7,.2,1); } .clock-wrap { display:flex; align-items:baseline; }
+#clock { display:none; }
+#date { color:rgba(242,239,232,.48); font-size:11px; font-weight:700; letter-spacing:.2em; }
 .weather { display:grid; grid-template-columns:auto auto; align-items:center; column-gap:8px; text-align:right; } .weather-symbol { width:27px; height:27px; color:rgba(242,239,232,.68); }
 .weather-symbol svg { display:block; width:27px; height:27px; overflow:visible; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; } .weather-symbol svg .weather-accent { color:#ffd49c; stroke:currentColor; }
 .weather strong { font-family:CalDisplay,Arial,sans-serif; font-size:27px; font-weight:500; letter-spacing:-.025em; } .weather small { grid-column:1/3; margin-top:4px; color:rgba(242,239,232,.42); font-size:11px; }
 .eyebrow { margin:0 0 8px; color:rgba(242,239,232,.42); font-size:10px; font-weight:760; letter-spacing:.2em; } .next>.eyebrow { color:rgba(255,212,178,.72); font-size:var(--event-kicker-size); transition:font-size 1.8s cubic-bezier(.2,.7,.2,1),color 1.2s ease; } .hidden { display:none!important; } .empty-state { color:rgba(242,239,232,.42); font-size:14px; }
-.next { position:absolute; top:126px; left:32px; width:520px; opacity:var(--event-opacity); transform:translateY(var(--event-shift)); transition:opacity 1.2s ease,transform 1.8s cubic-bezier(.2,.7,.2,1); }
+.next { position:absolute; z-index:1; top:92px; left:32px; width:390px; opacity:var(--event-opacity); transform:translateY(var(--event-shift)); transition:opacity 1.2s ease,transform 1.8s cubic-bezier(.2,.7,.2,1); text-shadow:0 2px 18px rgba(0,0,0,.7); }
+.world[data-track="false"] .next { top:auto; bottom:72px; }
 .event-state h1 { margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:CalDisplay,Arial,sans-serif; font-size:var(--event-size); line-height:1.02; font-weight:600; letter-spacing:-.026em; transition:font-size 1.8s cubic-bezier(.2,.7,.2,1); }
 .event-state p { display:flex; align-items:baseline; gap:11px; margin:9px 0 0; color:rgba(242,239,232,.58); font-size:13px; opacity:var(--event-detail-opacity); transition:opacity 1.2s ease; }
 .event-state strong { color:rgba(255,212,178,.9); font-size:13px; font-weight:680; } #event-location { overflow:hidden; color:rgba(242,239,232,.38); text-overflow:ellipsis; white-space:nowrap; }
-.music { position:absolute; left:31px; right:30px; bottom:58px; min-height:98px; display:grid; grid-template-columns:78px minmax(0,1fr) auto; align-items:end; gap:15px; opacity:0; transform:translateY(9px); transition:opacity 1.1s ease,transform 1.1s cubic-bezier(.2,.7,.2,1); }
+.music { position:absolute; z-index:1; left:31px; right:30px; bottom:58px; min-height:98px; display:grid; grid-template-columns:78px minmax(0,1fr) auto; align-items:end; gap:15px; opacity:0; transform:translateY(9px); transition:opacity 1.1s ease,transform 1.1s cubic-bezier(.2,.7,.2,1); }
 .album-art { width:78px; height:78px; object-fit:cover; border-radius:2px; opacity:0; transform:translateY(7px); box-shadow:0 12px 32px rgba(0,0,0,.3); transition:opacity 1s ease,transform 1s ease; }
 .track-copy { min-width:0; padding-bottom:3px; } .track-state h2 { margin:0; overflow:hidden; color:#f7f3ec; text-overflow:ellipsis; white-space:nowrap; font-family:CalDisplay,Arial,sans-serif; font-size:31px; line-height:1; font-weight:600; letter-spacing:-.026em; text-shadow:0 2px 20px rgba(0,0,0,.55); }
 .track-state>p { margin:7px 0 12px; overflow:hidden; color:rgba(242,239,232,.7); font-size:15px; text-overflow:ellipsis; white-space:nowrap; }
@@ -49,6 +50,7 @@ footer { position:absolute; left:30px; right:30px; bottom:18px; display:flex; ju
 .turn-state span { overflow:hidden; max-width:280px; color:rgba(242,239,232,.5); font-size:8px; font-weight:700; letter-spacing:.17em; text-overflow:ellipsis; white-space:nowrap; }
 .world[data-activity="listening"] .turn-state,.world[data-activity="thinking"] .turn-state { opacity:1; transform:translateY(0) scale(1); }
 .world[data-activity="listening"] .veil,.world[data-activity="thinking"] .veil,.world[data-activity="speaking"] .veil { opacity:.18; }
+.world[data-activity="listening"] #visual-field,.world[data-activity="thinking"] #visual-field,.world[data-activity="speaking"] #visual-field { filter:saturate(.86) brightness(.82) blur(.55px); }
 .world[data-activity="listening"] .mic { color:#f2c86f; }
 .world[data-activity="thinking"] .mic { color:#d8c9ac; }
 .response { position:absolute; z-index:2; left:72px; right:72px; top:164px; max-height:170px; overflow:hidden; color:#f7f3ec; font-family:CalDisplay,Arial,sans-serif; font-size:35px; line-height:1.04; font-weight:500; letter-spacing:-.022em; text-align:center; opacity:0; transform:translateY(10px); pointer-events:none; transition:opacity .8s ease,transform 1.2s cubic-bezier(.2,.7,.2,1); text-shadow:0 3px 28px rgba(0,0,0,.58); }

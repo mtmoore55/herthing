@@ -1,157 +1,22 @@
 (function () {
   'use strict'
-
-  var canvas = document.getElementById('visual-field')
-  var ctx = canvas.getContext('2d', { alpha: false })
-  var width = canvas.width
-  var height = canvas.height
-
-  var parameters = {
-    columns: 20, rows: 12, cellSoftness: .58, glow: .42,
-    idleMovementSpeed: .72, idleIntensity: .68,
-    userWavePropagationSpeed: 3.3, userWaveDecay: .9, userAmplitudeSensitivity: 1.22,
-    assistantWavePropagationSpeed: 2.75, assistantWaveDecay: .91, assistantAmplitudeSensitivity: 1.16,
-    musicResponsiveness: .2, albumColorInfluence: .38,
-    dayNightPaletteInterpolation: 1, overallBrightness: 1.18
-  }
-  var dayPalette = [[24,15,17],[72,32,40],[145,61,62],[210,118,69]]
-  var nightPalette = [[5,17,27],[11,44,72],[39,45,111],[69,37,124]]
-  var userPalette = [[255,91,133],[242,74,119],[255,157,118]]
-  var assistantPalette = [[24,170,231],[53,119,255],[107,85,224]]
-  var albumCurrent = [[38,27,30],[82,42,51],[36,46,63],[128,75,70]]
-  var albumTarget = albumCurrent.map(copyColor)
-  var music = false, dayAmount = .5, targetDayAmount = .5
-  var targetUser = 0, targetAssistant = 0, userEnergy = 0, assistantEnergy = 0
-  var urgency = 0, targetUrgency = 0, userWaves = [], assistantWaves = []
-  var lastUserEmission = 0, lastAssistantEmission = 0
-  var paused = false, speed = 1, intensity = 1, sceneTime = 0, lastFrame = 0
-  var frameCount = 0, fps = 0, fpsStarted = 0
-  var artwork = new Image(); artwork.crossOrigin = 'anonymous'
-
-  function clamp(value, min, max) { return Math.max(min, Math.min(max, value)) }
-  function mix(a, b, amount) { return a + (b - a) * amount }
-  function smoothstep(value) { value = clamp(value, 0, 1); return value * value * (3 - 2 * value) }
-  function copyColor(color) { return color.slice() }
-  function mixColor(a, b, amount) { return [mix(a[0],b[0],amount),mix(a[1],b[1],amount),mix(a[2],b[2],amount)] }
-  function addColor(base, color, amount) { return mixColor(base, color, amount) }
-  function rgb(color) { return 'rgb(' + color.map(Math.round).join(',') + ')' }
-  function gaussian(distance, spread) { return Math.exp(-(distance * distance) / Math.max(.001, 2 * spread * spread)) }
-  function hash(column, row) { var value = Math.sin(column * 127.1 + row * 311.7) * 43758.5453; return value - Math.floor(value) }
-  function fallback(seed) { var base=seed%180; return [[40+base%35,24,20],[120,55+base%70,42],[18,52+base%45,64],[105+base%65,78,118]] }
-
-  function sample(image) {
-    var sampleCanvas=document.createElement('canvas'); sampleCanvas.width=sampleCanvas.height=24
-    var sampleContext=sampleCanvas.getContext('2d'),buckets={}
-    try {
-      sampleContext.drawImage(image,0,0,24,24)
-      var pixels=sampleContext.getImageData(0,0,24,24).data
-      for(var index=0;index<pixels.length;index+=16){
-        var red=pixels[index],green=pixels[index+1],blue=pixels[index+2],high=Math.max(red,green,blue),low=Math.min(red,green,blue)
-        if(high<28||high-low<12)continue
-        var key=(red>>5)+'-'+(green>>5)+'-'+(blue>>5)
-        if(!buckets[key])buckets[key]={count:0,color:[0,0,0],saturation:0}
-        var bucket=buckets[key];bucket.count++;bucket.color[0]+=red;bucket.color[1]+=green;bucket.color[2]+=blue;bucket.saturation+=high-low
-      }
-      var colors=Object.keys(buckets).map(function(key){var bucket=buckets[key];return{color:bucket.color.map(function(value){return value/bucket.count}),weight:bucket.count*2+bucket.saturation/bucket.count}}).sort(function(a,b){return b.weight-a.weight}).slice(0,8).map(function(value){return value.color})
-      if(colors.length>=4)return[colors[0],colors[2],colors[1],colors[3]]
-    } catch(_) {}
-    return fallback(image.src.length)
-  }
-  artwork.onload=function(){albumTarget=sample(artwork)}
-  artwork.onerror=function(){albumTarget=fallback(artwork.src.length)}
-
-  function setArtwork(url,isPlaying){
-    music=Boolean(isPlaying)
-    if(url&&!/^(https?:|data:)/.test(url))albumTarget=fallback(url.length)
-    else if(url&&artwork.src!==url)artwork.src=url
-  }
-  function setVoice(activity,user,assistant){
-    targetUser=clamp(Number(user)||(activity==='listening'?.28:0),0,1)
-    targetAssistant=clamp(Number(assistant)||(activity==='speaking'?.32:0),0,1)
-  }
-  function setTimeOfDay(hours){
-    var hour=((Number(hours)%24)+24)%24
-    var dawn=smoothstep((hour-5.5)/2.5),dusk=1-smoothstep((hour-17.5)/3)
-    targetDayAmount=clamp(dawn*dusk,0,1)
-  }
-  function setUrgency(value){targetUrgency=clamp(Number(value)||0,0,1)}
-  function setPalette(colors){if(colors&&colors.length>=4)albumTarget=colors.map(copyColor)}
-  function setTuning(options){
-    options=options||{}
-    if(typeof options.paused==='boolean')paused=options.paused
-    if(options.speed!=null)speed=clamp(Number(options.speed)||0,.05,3)
-    if(options.intensity!=null)intensity=clamp(Number(options.intensity)||0,0,2)
-    Object.keys(parameters).forEach(function(key){if(options[key]!=null&&!isNaN(Number(options[key])))parameters[key]=Number(options[key])})
-    parameters.columns=Math.round(clamp(parameters.columns,8,32));parameters.rows=Math.round(clamp(parameters.rows,6,20))
-  }
-  function getDebugState(){return{fps:fps,paused:paused,speed:speed,intensity:intensity,dayAmount:Number(dayAmount.toFixed(3)),waves:{user:userWaves.length,assistant:assistantWaves.length},parameters:Object.assign({},parameters),albumPalette:albumTarget.map(function(color){return color.map(Math.round)})}}
-
-  function emitWave(kind,energy,now){
-    var waves=kind==='user'?userWaves:assistantWaves
-    var sensitivity=kind==='user'?parameters.userAmplitudeSensitivity:parameters.assistantAmplitudeSensitivity
-    waves.push({position:kind==='user'?parameters.rows-.3:-.7,amplitude:clamp(energy*sensitivity,.08,1.35),width:1.05+energy*1.65,phase:now*.0017+waves.length*1.37})
-    if(waves.length>5)waves.shift()
-  }
-  function advanceWaves(waves,direction,propagation,decay,deltaSeconds){
-    for(var index=waves.length-1;index>=0;index--){var wave=waves[index];wave.position+=direction*propagation*deltaSeconds*speed;wave.amplitude*=Math.pow(decay,deltaSeconds*1.5);if(wave.amplitude<.025||wave.position<-4||wave.position>parameters.rows+4)waves.splice(index,1)}
-  }
-  function simulate(delta,timestamp){
-    var deltaSeconds=Math.min(.12,delta/1000),voiceEase=1-Math.pow(.013,deltaSeconds)
-    userEnergy=mix(userEnergy,targetUser,voiceEase);assistantEnergy=mix(assistantEnergy,targetAssistant,voiceEase*.84)
-    urgency=mix(urgency,targetUrgency,1-Math.pow(.22,deltaSeconds));dayAmount=mix(dayAmount,targetDayAmount,1-Math.pow(.82,deltaSeconds))
-    for(var paletteIndex=0;paletteIndex<4;paletteIndex++)for(var channel=0;channel<3;channel++)albumCurrent[paletteIndex][channel]=mix(albumCurrent[paletteIndex][channel],albumTarget[paletteIndex][channel],1-Math.pow(.72,deltaSeconds))
-    if(userEnergy>.035&&timestamp-lastUserEmission>mix(820,330,userEnergy)){emitWave('user',userEnergy,timestamp);lastUserEmission=timestamp}
-    if(assistantEnergy>.035&&timestamp-lastAssistantEmission>mix(900,380,assistantEnergy)){emitWave('assistant',assistantEnergy,timestamp);lastAssistantEmission=timestamp}
-    advanceWaves(userWaves,-1,parameters.userWavePropagationSpeed,parameters.userWaveDecay,deltaSeconds)
-    advanceWaves(assistantWaves,1,parameters.assistantWavePropagationSpeed,parameters.assistantWaveDecay,deltaSeconds)
-  }
-  function waveAt(waves,row,column,columns){
-    var total=0,x=(column+.5)/columns
-    for(var index=0;index<waves.length;index++){
-      var wave=waves[index]
-      // Each wave crosses most of the display, but its front bends through
-      // the columns. This keeps the direction legible without drawing a
-      // literal horizontal waveform or a sequence of equalizer bars.
-      var bend=Math.sin(x*Math.PI*2.15+wave.phase)*.82+Math.sin(x*Math.PI*4.7-wave.phase*.53)*.34
-      var localPosition=wave.position+bend*(.5+wave.amplitude*.42)
-      var localWidth=wave.width*(.8+.23*Math.sin(x*Math.PI*3.2+wave.phase*.71))
-      var broadField=.7+.3*Math.sin(x*Math.PI*1.55+wave.phase*.37)
-      var facets=.88+.12*(hash(column,index+Math.floor(wave.phase*3))-.5)*2
-      total+=gaussian(row-localPosition,localWidth)*wave.amplitude*broadField*facets
-    }
-    return clamp(total,0,1.5)
-  }
-  function ambientAt(x,y,time){var slow=time*parameters.idleMovementSpeed,broad=Math.sin(x*5.2+slow*.37)+Math.cos(y*4.1-slow*.29),cross=Math.sin((x+y)*3.4+slow*.17)+Math.cos((x-y)*4.7-slow*.13);return clamp(.5+broad*.105+cross*.065,0,1)}
-  function paletteColor(level,x,y){
-    var night=mixColor(nightPalette[0],nightPalette[1],clamp(level*1.25,0,1));night=mixColor(night,nightPalette[2],clamp((x+level-.65)*.75,0,1));night=mixColor(night,nightPalette[3],clamp((y+level-.95)*.55,0,1))
-    var day=mixColor(dayPalette[0],dayPalette[1],clamp(level*1.28,0,1));day=mixColor(day,dayPalette[2],clamp((level+x-.7)*.72,0,1));day=mixColor(day,dayPalette[3],clamp((level+y-1.02)*.56,0,1))
-    return mixColor(night,day,dayAmount*parameters.dayNightPaletteInterpolation)
-  }
-
-  function renderGrid(time){
-    var columns=parameters.columns,rows=parameters.rows,cellWidth=width/columns,cellHeight=height/rows
-    var idleScale=parameters.idleIntensity*intensity*(1-urgency*.48),albumInfluence=music?parameters.albumColorInfluence:0,brightness=parameters.overallBrightness*mix(.74,1,dayAmount)
-    ctx.fillStyle='#05080b';ctx.fillRect(0,0,width,height)
-    for(var row=0;row<rows;row++)for(var column=0;column<columns;column++){
-      var x=(column+.5)/columns,y=(row+.5)/rows,ambient=ambientAt(x,y,time)
-      var neighbor=(ambientAt(x+1/columns,y,time)+ambientAt(x-1/columns,y,time)+ambientAt(x,y+1/rows,time)+ambientAt(x,y-1/rows,time))*.25
-      var level=mix(ambient,neighbor,parameters.cellSoftness)*idleScale,color=paletteColor(level,x,y)
-      if(albumInfluence){var albumA=mixColor(albumCurrent[0],albumCurrent[1],clamp(x*.85+level*.3,0,1)),albumB=mixColor(albumCurrent[2],albumCurrent[3],clamp(y*.72+level*.4,0,1));color=mixColor(color,mixColor(albumA,albumB,.5+Math.sin(time*.19+x*3)*.12),albumInfluence)}
-      var user=waveAt(userWaves,row,column,columns),assistant=waveAt(assistantWaves,row,column,columns)
-      color=addColor(color,mixColor(userPalette[0],userPalette[2],clamp(x*.55+user*.18,0,1)),clamp(user*.76,0,.88))
-      color=addColor(color,mixColor(assistantPalette[0],assistantPalette[2],clamp((1-x)*.48+assistant*.2,0,1)),clamp(assistant*.78,0,.9))
-      var edge=clamp(1-Math.pow(Math.abs(x-.5)*1.55,2)-Math.pow(Math.abs(y-.52)*1.18,2),.3,1),shimmer=(hash(column,row)-.5)*.045
-      var luminous=(.46+level*1.08+user*.55+assistant*.55+parameters.glow*(user+assistant)*.24+shimmer)*edge*brightness
-      color=color.map(function(channel){return clamp(channel*luminous,3,255)})
-      ctx.fillStyle=rgb(color);ctx.fillRect(Math.floor(column*cellWidth),Math.floor(row*cellHeight),Math.ceil(cellWidth)+1,Math.ceil(cellHeight)+1)
-    }
-  }
-  function frame(timestamp){
-    var delta=Math.min(100,timestamp-lastFrame||80);lastFrame=timestamp
-    if(!paused){sceneTime+=delta*speed;simulate(delta,timestamp)}
-    frameCount++;if(!fpsStarted)fpsStarted=timestamp;if(timestamp-fpsStarted>=1000){fps=Math.round(frameCount*1000/(timestamp-fpsStarted));frameCount=0;fpsStarted=timestamp}
-    renderGrid(sceneTime*.00013);setTimeout(function(){requestAnimationFrame(frame)},80)
-  }
-  window.HerThingVisuals={setArtwork:setArtwork,setVoice:setVoice,setTimeOfDay:setTimeOfDay,setUrgency:setUrgency,setPalette:setPalette,setTuning:setTuning,getDebugState:getDebugState}
-  requestAnimationFrame(frame)
+  var canvas=document.getElementById('visual-field'),ctx=canvas.getContext('2d',{alpha:false}),width=canvas.width,height=canvas.height
+  var parameters={columns:40,rows:24,cellSoftness:.46,glow:.4,gridEnergy:.88,gridDepth:.72,idleMovementSpeed:.64,idleIntensity:.8,userWavePropagationSpeed:5.2,userWaveDecay:.9,userAmplitudeSensitivity:1.22,assistantWavePropagationSpeed:4.7,assistantWaveDecay:.91,assistantAmplitudeSensitivity:1.16,musicResponsiveness:.2,albumColorInfluence:.4,dayNightPaletteInterpolation:1,overallBrightness:1.24,clockVoidStrength:.72,clockBoundaryDisplacement:.02,clockInsideOpacity:.35,clockInsideMotion:.12,clockEdgeSoftness:.34,clockScale:.82}
+  var dayPalette=[[24,15,17],[72,32,40],[145,61,62],[210,118,69]],nightPalette=[[5,17,27],[11,44,72],[39,45,111],[69,37,124]],userPalette=[[255,91,133],[242,74,119],[255,157,118]],assistantPalette=[[24,170,231],[53,119,255],[107,85,224]]
+  var albumCurrent=[[38,27,30],[82,42,51],[36,46,63],[128,75,70]],albumTarget=albumCurrent.map(copyColor),music=false,dayAmount=.5,targetDayAmount=.5,timeOfDaySet=false,targetUser=0,targetAssistant=0,userEnergy=0,assistantEnergy=0,conversation=0,targetConversation=0,urgency=0,targetUrgency=0,userWaves=[],assistantWaves=[],lastUserEmission=0,lastAssistantEmission=0,paused=false,speed=1,intensity=1,sceneTime=0,lastFrame=0,frameCount=0,fps=0,fpsStarted=0
+  var clockStyle='hybrid',clockText='',clockMask=[],previousClockMask=[],clockChangedAt=0,clockTransitionMs=2200,artwork=new Image();artwork.crossOrigin='anonymous'
+  var glyphs={'0':['111','101','101','101','111'],'1':['010','110','010','010','111'],'2':['111','001','111','100','111'],'3':['111','001','111','001','111'],'4':['101','101','111','001','001'],'5':['111','100','111','001','111'],'6':['111','100','111','101','111'],'7':['111','001','010','010','010'],'8':['111','101','111','101','111'],'9':['111','101','111','001','111'],':':['0','1','0','1','0']}
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v))} function mix(a,b,t){return a+(b-a)*t} function smoothstep(v){v=clamp(v,0,1);return v*v*(3-2*v)} function copyColor(c){return c.slice()} function mixColor(a,b,t){return[mix(a[0],b[0],t),mix(a[1],b[1],t),mix(a[2],b[2],t)]} function rgb(c){return'rgb('+c.map(Math.round).join(',')+')'} function gaussian(d,s){return Math.exp(-(d*d)/Math.max(.001,2*s*s))} function hash(c,r){var v=Math.sin(c*127.1+r*311.7)*43758.5453;return v-Math.floor(v)} function fallback(seed){var b=seed%180;return[[40+b%35,24,20],[120,55+b%70,42],[18,52+b%45,64],[105+b%65,78,118]]}
+  function sample(image){var c=document.createElement('canvas');c.width=c.height=24;var x=c.getContext('2d'),b={};try{x.drawImage(image,0,0,24,24);var p=x.getImageData(0,0,24,24).data;for(var i=0;i<p.length;i+=16){var r=p[i],g=p[i+1],q=p[i+2],hi=Math.max(r,g,q),lo=Math.min(r,g,q);if(hi<28||hi-lo<12)continue;var k=(r>>5)+'-'+(g>>5)+'-'+(q>>5);if(!b[k])b[k]={n:0,c:[0,0,0],s:0};b[k].n++;b[k].c[0]+=r;b[k].c[1]+=g;b[k].c[2]+=q;b[k].s+=hi-lo}var colors=Object.keys(b).map(function(k){var v=b[k];return{c:v.c.map(function(n){return n/v.n}),w:v.n*2+v.s/v.n}}).sort(function(a,z){return z.w-a.w}).slice(0,8).map(function(v){return v.c});if(colors.length>=4)return[colors[0],colors[2],colors[1],colors[3]]}catch(_){}return fallback(image.src.length)}
+  artwork.onload=function(){albumTarget=sample(artwork)};artwork.onerror=function(){albumTarget=fallback(artwork.src.length)}
+  function buildClockMask(text){var columns=parameters.columns,rows=parameters.rows,chars=String(text||'10:42').replace(/\s*(AM|PM)$/i,''),units=0;for(var i=0;i<chars.length;i++)units+=(chars[i]===':'?1:3)+(i<chars.length-1?1:0);var sx=columns*parameters.clockScale/units,sy=rows*.58/5,startX=(columns-units*sx)/2,startY=(rows-5*sy)/2,mask=new Array(columns*rows).fill(0),cursor=0;for(var ci=0;ci<chars.length;ci++){var glyph=glyphs[chars[ci]],gw=chars[ci]===':'?1:3;if(glyph)for(var gy=0;gy<5;gy++)for(var gx=0;gx<gw;gx++)if(glyph[gy][gx]==='1'){var left=startX+(cursor+gx)*sx,right=startX+(cursor+gx+1)*sx,top=startY+gy*sy,bottom=startY+(gy+1)*sy;for(var row=Math.max(0,Math.floor(top));row<Math.min(rows,Math.ceil(bottom));row++)for(var col=Math.max(0,Math.floor(left));col<Math.min(columns,Math.ceil(right));col++){var ox=Math.max(0,Math.min(right,col+1)-Math.max(left,col)),oy=Math.max(0,Math.min(bottom,row+1)-Math.max(top,row));mask[row*columns+col]=Math.max(mask[row*columns+col],smoothstep(ox*oy*(1+parameters.clockEdgeSoftness)))}}cursor+=gw+1}var softened=mask.slice();for(var r=1;r<rows-1;r++)for(var c=1;c<columns-1;c++){var at=r*columns+c;softened[at]=clamp(mask[at]*.72+(mask[at-1]+mask[at+1]+mask[at-columns]+mask[at+columns])*.07,0,1)}return softened}
+  function rebuildClockMasks(){clockMask=buildClockMask(clockText||'10:42');previousClockMask=clockMask.slice()} function setClock(text,instant){text=String(text||'').replace(/\s*(AM|PM)$/i,'');if(!text||text===clockText)return;previousClockMask=clockMask.length?clockMask.slice():buildClockMask(text);clockText=text;clockMask=buildClockMask(text);clockChangedAt=instant?0:performance.now()} function maskAt(i,now){if(!clockChangedAt)return clockMask[i]||0;var p=smoothstep((now-clockChangedAt)/clockTransitionMs);if(p>=1){clockChangedAt=0;return clockMask[i]||0}return mix(previousClockMask[i]||0,clockMask[i]||0,p)} function maskSample(c,r,now){c=clamp(c,0,parameters.columns-1);r=clamp(r,0,parameters.rows-1);return maskAt(Math.round(r)*parameters.columns+Math.round(c),now)}
+  function setArtwork(url,playing){music=Boolean(playing);if(url&&!/^(https?:|data:)/.test(url))albumTarget=fallback(url.length);else if(url&&artwork.src!==url)artwork.src=url} function setVoice(activity,user,assistant){targetUser=clamp(Number(user)||(activity==='listening'?.28:0),0,1);targetAssistant=clamp(Number(assistant)||(activity==='speaking'?.32:0),0,1);targetConversation=activity==='idle'?0:1} function setTimeOfDay(hours){var h=((Number(hours)%24)+24)%24,dawn=smoothstep((h-5.5)/2.5),dusk=1-smoothstep((h-17.5)/3);targetDayAmount=clamp(dawn*dusk,0,1);if(!timeOfDaySet){dayAmount=targetDayAmount;timeOfDaySet=true}} function setUrgency(v){targetUrgency=clamp(Number(v)||0,0,1)} function setPalette(c){if(c&&c.length>=4)albumTarget=c.map(copyColor)} function setClockStyle(style){if(['void','force','calm','hybrid'].indexOf(style)>=0){clockStyle=style;parameters.clockBoundaryDisplacement=style==='force'?.55:style==='hybrid'?.02:0}}
+  function setTuning(o){o=o||{};if(typeof o.paused==='boolean')paused=o.paused;if(o.speed!=null)speed=clamp(Number(o.speed)||0,.05,3);if(o.intensity!=null)intensity=clamp(Number(o.intensity)||0,0,2);if(o.clockStyle)setClockStyle(o.clockStyle);var rebuild=false;Object.keys(parameters).forEach(function(k){if(o[k]!=null&&!isNaN(Number(o[k]))){if(k==='columns'||k==='rows'||k==='clockScale'||k==='clockEdgeSoftness')rebuild=true;parameters[k]=Number(o[k])}});parameters.columns=Math.round(clamp(parameters.columns,24,56));parameters.rows=Math.round(clamp(parameters.rows,14,32));if(rebuild)rebuildClockMasks()} function getDebugState(){return{fps:fps,clock:clockText,clockStyle:clockStyle,dayAmount:Number(dayAmount.toFixed(3)),waves:{user:userWaves.length,assistant:assistantWaves.length},parameters:Object.assign({},parameters),albumPalette:albumTarget.map(function(c){return c.map(Math.round)})}}
+  function emitWave(kind,energy,now){var waves=kind==='user'?userWaves:assistantWaves,s=kind==='user'?parameters.userAmplitudeSensitivity:parameters.assistantAmplitudeSensitivity;waves.push({position:kind==='user'?parameters.rows-.3:-.7,amplitude:clamp(energy*s,.08,1.35),width:1.4+energy*2.4,phase:now*.0017+waves.length*1.37});if(waves.length>5)waves.shift()} function advanceWaves(waves,direction,propagation,decay,dt){for(var i=waves.length-1;i>=0;i--){var w=waves[i];w.position+=direction*propagation*dt*speed;w.amplitude*=Math.pow(decay,dt*1.5);if(w.amplitude<.025||w.position<-5||w.position>parameters.rows+5)waves.splice(i,1)}}
+  function simulate(delta,timestamp){var dt=Math.min(.08,delta/1000),ease=1-Math.pow(.013,dt);userEnergy=mix(userEnergy,targetUser,ease);assistantEnergy=mix(assistantEnergy,targetAssistant,ease*.84);conversation=mix(conversation,targetConversation,1-Math.pow(.05,dt));urgency=mix(urgency,targetUrgency,1-Math.pow(.22,dt));dayAmount=mix(dayAmount,targetDayAmount,1-Math.pow(.82,dt));for(var p=0;p<4;p++)for(var c=0;c<3;c++)albumCurrent[p][c]=mix(albumCurrent[p][c],albumTarget[p][c],1-Math.pow(.72,dt));if(userEnergy>.035&&timestamp-lastUserEmission>mix(820,330,userEnergy)){emitWave('user',userEnergy,timestamp);lastUserEmission=timestamp}if(assistantEnergy>.035&&timestamp-lastAssistantEmission>mix(900,380,assistantEnergy)){emitWave('assistant',assistantEnergy,timestamp);lastAssistantEmission=timestamp}advanceWaves(userWaves,-1,parameters.userWavePropagationSpeed,parameters.userWaveDecay,dt);advanceWaves(assistantWaves,1,parameters.assistantWavePropagationSpeed,parameters.assistantWaveDecay,dt)}
+  function waveAt(waves,row,column){var total=0,x=(column+.5)/parameters.columns;for(var i=0;i<waves.length;i++){var w=waves[i],bend=Math.sin(x*Math.PI*2.15+w.phase)*1.2+Math.sin(x*Math.PI*4.7-w.phase*.53)*.52,pos=w.position+bend*(.5+w.amplitude*.42),wide=w.width*(.8+.23*Math.sin(x*Math.PI*3.2+w.phase*.71)),field=.7+.3*Math.sin(x*Math.PI*1.55+w.phase*.37);total+=gaussian(row-pos,wide)*w.amplitude*field}return clamp(total,0,1.5)} function ambientAt(x,y,time,motion){var slow=time*parameters.idleMovementSpeed*motion,broad=Math.sin(x*5.2+slow*.37)+Math.cos(y*4.1-slow*.29),cross=Math.sin((x+y)*3.4+slow*.17)+Math.cos((x-y)*4.7-slow*.13);return clamp(.5+broad*.105+cross*.065,0,1)} function paletteColor(level,x,y){var n=mixColor(nightPalette[0],nightPalette[1],clamp(level*1.25,0,1));n=mixColor(n,nightPalette[2],clamp((x+level-.65)*.75,0,1));n=mixColor(n,nightPalette[3],clamp((y+level-.95)*.55,0,1));var d=mixColor(dayPalette[0],dayPalette[1],clamp(level*1.28,0,1));d=mixColor(d,dayPalette[2],clamp((level+x-.7)*.72,0,1));d=mixColor(d,dayPalette[3],clamp((level+y-1.02)*.56,0,1));return mixColor(n,d,dayAmount*parameters.dayNightPaletteInterpolation)}
+  function renderGrid(time,now){var columns=parameters.columns,rows=parameters.rows,cw=width/columns,ch=height/rows,idle=parameters.idleIntensity*parameters.gridEnergy*intensity*(1-urgency*.35),album=music?parameters.albumColorInfluence:0,brightness=parameters.overallBrightness*mix(.76,1,dayAmount)*mix(1,.72,conversation);ctx.fillStyle='#05080b';ctx.fillRect(0,0,width,height);for(var row=0;row<rows;row++)for(var column=0;column<columns;column++){var index=row*columns+column,mask=maskAt(index,now),left=maskSample(column-1,row,now),right=maskSample(column+1,row,now),up=maskSample(column,row-1,now),down=maskSample(column,row+1,now),gx=right-left,gy=down-up,boundary=clamp(Math.abs(gx)+Math.abs(gy),0,1),motion=mix(1,parameters.clockInsideMotion,mask),x=(column+.5)/columns,y=(row+.5)/rows,ambient=ambientAt(x,y,time,motion),neighbor=(ambientAt(x+1/columns,y,time,motion)+ambientAt(x-1/columns,y,time,motion)+ambientAt(x,y+1/rows,time,motion)+ambientAt(x,y-1/rows,time,motion))*.25,level=mix(ambient,neighbor,parameters.cellSoftness)*idle,color=paletteColor(level,x,y);if(album){var a=mixColor(albumCurrent[0],albumCurrent[1],clamp(x*.85+level*.3,0,1)),b=mixColor(albumCurrent[2],albumCurrent[3],clamp(y*.72+level*.4,0,1));color=mixColor(color,mixColor(a,b,.5+Math.sin(time*.19+x*3)*.12),album)}var user=waveAt(userWaves,row,column),assistant=waveAt(assistantWaves,row,column);color=mixColor(color,mixColor(userPalette[0],userPalette[2],x*.55),clamp(user*.76,0,.88));color=mixColor(color,mixColor(assistantPalette[0],assistantPalette[2],(1-x)*.48),clamp(assistant*.78,0,.9));var voidAmount=clockStyle==='force'?0:clockStyle==='calm'?parameters.clockVoidStrength*.5:parameters.clockVoidStrength,insideOpacity=clockStyle==='void'?parameters.clockInsideOpacity*.45:clockStyle==='calm'?parameters.clockInsideOpacity*2.2:parameters.clockInsideOpacity,edge=clamp(1-Math.pow(Math.abs(x-.5)*1.48,2)-Math.pow(Math.abs(y-.52)*1.12,2),.34,1),shimmer=(hash(column,row)-.5)*.04,luminous=(.5+level*1.12+user*.55+assistant*.55+parameters.glow*(user+assistant)*.24+shimmer)*edge*brightness;luminous*=mix(1,insideOpacity,mask*voidAmount);if(clockStyle==='force'||clockStyle==='hybrid')luminous*=1+boundary*.18;color=color.map(function(v){return clamp(v*luminous,2,255)});var force=(clockStyle==='force'?1:clockStyle==='hybrid'?.55:0)*parameters.clockBoundaryDisplacement,dx=-gx*force*cw*1.5,dy=-gy*force*ch*1.5,shrink=1-mask*(clockStyle==='calm'?.22:clockStyle==='hybrid'?.08:0);ctx.fillStyle=rgb(color);ctx.fillRect(Math.floor(column*cw+dx+(1-shrink)*cw*.5),Math.floor(row*ch+dy+(1-shrink)*ch*.5),Math.ceil(cw*shrink)+.5,Math.ceil(ch*shrink)+.5)}}
+  function frame(timestamp){var delta=Math.min(80,timestamp-lastFrame||16);lastFrame=timestamp;if(!paused){sceneTime+=delta*speed;simulate(delta,timestamp)}frameCount++;if(!fpsStarted)fpsStarted=timestamp;if(timestamp-fpsStarted>=1000){fps=Math.round(frameCount*1000/(timestamp-fpsStarted));frameCount=0;fpsStarted=timestamp}renderGrid(sceneTime*.00013,timestamp);requestAnimationFrame(frame)}
+  window.HerThingVisuals={setArtwork:setArtwork,setVoice:setVoice,setTimeOfDay:setTimeOfDay,setUrgency:setUrgency,setPalette:setPalette,setClock:setClock,setClockStyle:setClockStyle,setTuning:setTuning,getDebugState:getDebugState};setClock('10:42',true);requestAnimationFrame(frame)
 })()

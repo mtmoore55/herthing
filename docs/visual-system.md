@@ -2,10 +2,26 @@
 
 HerThing renders one continuous visual world rather than switching between
 dashboard, music, and voice pages. The DOM is a sparse semantic information
-layer over a dependency-free Canvas 2D field. That field is a deliberately
-low-resolution 20×12 grid of atmospheric rectangular cells. Broad, diffused
+layer over a dependency-free Canvas 2D field. That field is an adaptive,
+architectural grid (40×24 by default) of atmospheric rectangular cells. Broad, diffused
 light fields preserve the cells while preventing the result from reading as an
 equalizer or literal pixel art.
+
+The composition has three depths:
+
+1. **Background — time and ambient world.** The grid itself forms the time. A
+   cached mask makes cells inside and around custom grid-derived numerals behave
+   differently, so the clock reads as calm negative space rather than text.
+2. **Midground — calendar and music.** Restrained typography and album artwork
+   float over the environment and continuously yield as event urgency rises.
+3. **Foreground — voice.** Listening, transcription, thinking, and HerThing's
+   response can supersede the information layer while the clock world remains
+   alive underneath.
+
+Clock masks are rebuilt only when the displayed minute or grid geometry
+changes. A 2.2-second mask interpolation lets the field reorganize between
+minutes. The renderer runs on `requestAnimationFrame`; high-frequency animation
+never passes through application DOM state.
 
 HerThing bundles Cal Sans v2 rather than depending on host fonts. Cal Sans is
 used at display optical sizes for the clock, events, track titles, weather, and
@@ -22,8 +38,9 @@ to the font assets.
 - `microphone.activity` distinguishes idle, listening, thinking, and speaking.
 - Optional `microphone.user_energy` and `microphone.assistant_energy` are
   normalized `0..1` inputs reserved for the Phase 4 audio pipeline.
-- Clock, weather, next event, connection, and privacy state remain ordinary
-  low-frequency DOM state.
+- Weather, next event, connection, and privacy remain ordinary low-frequency
+  DOM state. Time is a low-frequency renderer input instead: its cached mask
+  changes only at minute boundaries.
 - `minutesUntilNextEvent` is mapped through a smooth urgency curve. Urgency
   continuously changes event type scale, spacing, contrast, supporting detail,
   background energy, and how much Conditions and music yield.
@@ -78,8 +95,26 @@ Then open `http://127.0.0.1:8790/?debug=1` in an 800×480 browser viewport.
 The production display never loads the workbench unless this query parameter is
 present.
 
+## Touch controls
+
+- Tap the previous, play/pause, and next buttons beside the active track. The
+  controls remain available while music is paused.
+- Tap the calendar summary (or press preset 3) to open today's remaining
+  agenda, then swipe vertically to scroll. Tap the close button, press Back, or
+  press preset 1 to return home.
+- The physical knob continues to control volume, and its press remains reserved
+  for conversation.
+
+Weather artwork is inline SVG rather than font glyphs so clear, partly cloudy,
+cloudy, rain, snow, fog, and storm states render on the device's older Chromium
+without depending on missing system-font symbols.
+
 Workbench controls include:
 
+- arbitrary time and a forced minute transition;
+- hybrid, void, force-field, and calm-field clock treatments;
+- grid density and energy, clock void strength, boundary influence, and scale;
+- no-calendar, live-transcription, and thinking scenarios;
 - a compact scenario gallery and full scenario picker;
 - continuous event-minutes, user-energy, and assistant-energy controls;
 - pause, study speed, motion, cell softness, glow, voice-wave, and brightness
