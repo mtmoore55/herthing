@@ -25,9 +25,46 @@ async function run(command, args) {
   return { stdout, stderr }
 }
 
-async function transcribeWithServer(wavPath, options) {
+export function pcmS32leToWav(pcm, { gainDb = 24 } = {}) {
+  const source = pcm instanceof Uint8Array ? pcm : new Uint8Array(pcm)
+  const samples = Math.floor(source.byteLength / 4)
+  const wav = new Uint8Array(44 + samples * 2)
+  const header = new DataView(wav.buffer)
+  const ascii = (offset, value) => [...value].forEach((character, index) => header.setUint8(offset + index, character.charCodeAt(0)))
+  ascii(0, 'RIFF')
+  header.setUint32(4, 36 + samples * 2, true)
+  ascii(8, 'WAVE')
+  ascii(12, 'fmt ')
+  header.setUint32(16, 16, true)
+  header.setUint16(20, 1, true)
+  header.setUint16(22, 1, true)
+  header.setUint32(24, 16000, true)
+  header.setUint32(28, 32000, true)
+  header.setUint16(32, 2, true)
+  header.setUint16(34, 16, true)
+  ascii(36, 'data')
+  header.setUint32(40, samples * 2, true)
+
+  const input = new DataView(source.buffer, source.byteOffset, samples * 4)
+  const gain = 2 ** (gainDb / 6.0206)
+  const highpassAlpha = (1 / (2 * Math.PI * 80)) / ((1 / (2 * Math.PI * 80)) + (1 / 16000))
+  let previousInput = 0
+  let previousOutput = 0
+  for (let index = 0; index < samples; index += 1) {
+    const currentInput = input.getInt32(index * 4, true) / 65536
+    const filtered = highpassAlpha * (previousOutput + currentInput - previousInput)
+    previousInput = currentInput
+    previousOutput = filtered
+    const amplified = filtered * gain
+    const limited = 29490 * Math.tanh(amplified / 29490)
+    header.setInt16(44 + index * 2, Math.round(limited), true)
+  }
+  return wav
+}
+
+async function transcribeWithServer(wav, options) {
   const form = new FormData()
-  form.append('file', Bun.file(wavPath), 'utterance.wav')
+  form.append('file', new Blob([wav], { type: 'audio/wav' }), 'utterance.wav')
   form.append('response_format', 'json')
   form.append('temperature', '0.0')
   form.append('temperature_inc', '0.0')
@@ -43,35 +80,28 @@ async function transcribeWithServer(wavPath, options) {
 export async function transcribeS32le(pcm, options = {}) {
   const binary = options.binary || process.env.HERTHING_WHISPER_BINARY || defaultBinary
   const model = options.model || process.env.HERTHING_WHISPER_MODEL || defaultModel
-  const key = crypto.randomUUID()
-  const rawPath = `/dev/shm/herthing-${key}.s32le`
-  const wavPath = `/dev/shm/herthing-${key}.wav`
   const startedAt = performance.now()
+  const wav = pcmS32leToWav(pcm, options)
+  let text
   try {
-    await Bun.write(rawPath, pcm)
-    await run('/usr/bin/ffmpeg', [
-      '-hide_banner', '-loglevel', 'error', '-y',
-      '-f', 's32le', '-ar', '16000', '-ac', '1', '-i', rawPath,
-      '-af', 'highpass=f=80,lowpass=f=7600,volume=24dB,alimiter=limit=0.9',
-      '-c:a', 'pcm_s16le', wavPath
-    ])
-    let text
+    text = await transcribeWithServer(wav, options)
+  } catch (error) {
+    console.warn('[stt] persistent worker unavailable; using one-shot whisper:', error.message || error)
+    const wavPath = `/dev/shm/herthing-${crypto.randomUUID()}.wav`
+    await Bun.write(wavPath, wav)
     try {
-      text = await transcribeWithServer(wavPath, options)
-    } catch (error) {
-      console.warn('[stt] persistent worker unavailable; using one-shot whisper:', error.message || error)
       const result = await run(binary, [
         '--model', model, '--file', wavPath, '--threads', '4',
         '--language', 'en', '--no-gpu', '--no-timestamps', '--no-prints',
         '--best-of', '1', '--beam-size', '1', '--prompt', domainPrompt
       ])
       text = normalizeTranscript(result.stdout)
+    } finally {
+      await unlink(wavPath).catch(() => {})
     }
-    return {
-      text,
-      elapsed_ms: Math.round(performance.now() - startedAt)
-    }
-  } finally {
-    await Promise.allSettled([unlink(rawPath), unlink(wavPath)])
+  }
+  return {
+    text,
+    elapsed_ms: Math.round(performance.now() - startedAt)
   }
 }

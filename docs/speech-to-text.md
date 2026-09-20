@@ -18,11 +18,12 @@ the one-shot CLI if that worker is unavailable.
 
 ## Privacy path
 
-The host accumulates one active utterance in memory. At speech end it writes raw
-PCM and a normalized WAV only under `/dev/shm`, invokes the local recognizer,
-and removes both in a `finally` block. No microphone audio is written to
-persistent storage. Starting the next utterance clears the previous transcript
-from shared state.
+The host accumulates one active utterance in memory. At speech end it converts
+the device's 32-bit PCM into an amplified 16-bit WAV in memory and posts it to
+the persistent recognizer. No microphone audio is written to storage on the
+normal path. The one-shot recovery path uses a short-lived `/dev/shm` WAV and
+deletes it immediately. Starting the next utterance clears the previous
+transcript from shared state.
 
 ## Physical benchmark
 

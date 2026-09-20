@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { calendarConfig, fetchNextEvent, findNextEvent } from './calendar.js'
+import { calendarConfig, fetchCalendarState, fetchNextEvent, findEventsBetween, findNextEvent } from './calendar.js'
 
 const calendar = `BEGIN:VCALENDAR\r
 VERSION:2.0\r
@@ -56,5 +56,20 @@ END:VCALENDAR\r
       fakeFetch
     )
     expect(event?.title).toBe('Call Andy')
+  })
+
+  test('returns an ordered agenda within a day', () => {
+    const events = findEventsBetween(calendar, new Date('2026-09-19T16:00:00Z'), new Date('2026-09-20T00:00:00Z'))
+    expect(events.map((event) => event.title)).toEqual(['Call Andy', 'Design Review'])
+  })
+
+  test('fetches the next event and today agenda together', async () => {
+    const result = await fetchCalendarState(
+      { url: 'https://example.test/me.ics' },
+      new Date('2026-09-19T16:00:00Z'),
+      async () => new Response(calendar)
+    )
+    expect(result.next_event?.title).toBe('Call Andy')
+    expect(result.today_events).toHaveLength(2)
   })
 })

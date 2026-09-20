@@ -37,7 +37,7 @@ export function createSpeechEndpointDetector({
   silenceDb = -65,
   startupDelayMs = 450,
   minimumSpeechMs = 300,
-  trailingSilenceMs = 900
+  trailingSilenceMs = 650
 } = {}) {
   let voicedMs = 0
   let quietMs = 0

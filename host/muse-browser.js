@@ -13,7 +13,7 @@ export function museBrowserConfig() {
     debugUrl: process.env.HERTHING_MUSE_BROWSER_DEBUG_URL || defaultDebugUrl,
     chatUrl: process.env.HERTHING_MUSE_BROWSER_CHAT_URL || null,
     timeoutMs: Number(process.env.HERTHING_MUSE_BROWSER_TIMEOUT_MS || 90000),
-    settleMs: Number(process.env.HERTHING_MUSE_BROWSER_SETTLE_MS || 900)
+    settleMs: Number(process.env.HERTHING_MUSE_BROWSER_SETTLE_MS || 450)
   }
 }
 

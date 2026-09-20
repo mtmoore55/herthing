@@ -20,15 +20,35 @@ conversation chain. Speech endpointing submits each utterance automatically.
 After HerThing speaks, capture reopens and the user can continue without another
 button press or wake word. Each real utterance extends the session; silent
 15-second capture windows are recycled in memory without transcription or
-storage until the session expires. Pressing the knob again, pressing preset 4,
-or reaching the inactivity deadline closes the session and publishes MIC OFF.
+storage until the session expires. Pressing the knob again, speaking a natural
+closing phrase, or reaching the inactivity deadline closes the session and
+returns to AMBIENT. Preset 4 remains the explicit privacy control and publishes
+MIC OFF.
 VAD triggers alone do not extend the deadline; the normalized transcript must
 contain an actual utterance.
+
+Endpointing uses 650 ms of trailing silence, and automatic follow-up capture
+starts 300 ms after a completed turn. The Muse browser bridge uses a 450 ms
+stable-text window; set `HERTHING_MUSE_BROWSER_SETTLE_MS` higher if a future
+Muse UI streams unusually long pauses between response fragments.
 
 Pressing the knob while HerThing is speaking is a safe manual barge-in: playback
 is cancelled immediately and capture reopens without closing the conversation.
 Voice-triggered full-duplex barge-in remains disabled until the audio path has
 echo cancellation; otherwise the shed speakers could interrupt themselves.
+
+## Ambient wake and conversational sleep
+
+In AMBIENT, PCM travels only across the private USB link to the Omarchy host.
+VAD and Whisper run locally, raw audio remains memory-only, and transcripts are
+discarded unless they begin with `Ziggy` (optionally `Hey Ziggy`). A wake phrase
+may include its request in the same utterance. Nothing is sent to Muse merely
+because room speech was detected.
+
+During conversation, short complete phrases such as “Okay, that's it,” “Okay,
+thank you,” “Thanks Ziggy,” and “Goodnight Ziggy” close the session locally.
+They are intentionally anchored as complete utterances so “thank you, but…” is
+still treated as a conversational continuation.
 
 Whisper ambient captions such as `[typing]`, `[applause]`, and `[laughs]` are
 discarded before the assistant boundary. They remain neither conversation turns

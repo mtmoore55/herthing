@@ -35,8 +35,8 @@ and restrained cyan at night. Slow incommensurate fields move across it on the
 scale of many seconds.
 
 Voice is modeled as independent impulses in a small row-based simulation. User
-energy enters at the top in warm pink and travels downward; HerThing energy
-enters at the bottom in cyan and blue-violet and travels upward. Amplitude
+energy enters at the bottom in warm pink and travels upward; HerThing energy
+enters at the top in cyan and blue-violet and travels downward. Amplitude
 controls each wave's brightness and depth. The impulses can coexist and blend,
 so rapid turn-taking emerges from the model rather than invoking a canned
 conversation animation. There are no waveform or orb elements.

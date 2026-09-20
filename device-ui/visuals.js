@@ -89,7 +89,7 @@
   function emitWave(kind,energy,now){
     var waves=kind==='user'?userWaves:assistantWaves
     var sensitivity=kind==='user'?parameters.userAmplitudeSensitivity:parameters.assistantAmplitudeSensitivity
-    waves.push({position:kind==='user'?-.7:parameters.rows-.3,amplitude:clamp(energy*sensitivity,.08,1.35),width:1.05+energy*1.65,phase:now*.0017+waves.length*1.37})
+    waves.push({position:kind==='user'?parameters.rows-.3:-.7,amplitude:clamp(energy*sensitivity,.08,1.35),width:1.05+energy*1.65,phase:now*.0017+waves.length*1.37})
     if(waves.length>5)waves.shift()
   }
   function advanceWaves(waves,direction,propagation,decay,deltaSeconds){
@@ -102,8 +102,8 @@
     for(var paletteIndex=0;paletteIndex<4;paletteIndex++)for(var channel=0;channel<3;channel++)albumCurrent[paletteIndex][channel]=mix(albumCurrent[paletteIndex][channel],albumTarget[paletteIndex][channel],1-Math.pow(.72,deltaSeconds))
     if(userEnergy>.035&&timestamp-lastUserEmission>mix(820,330,userEnergy)){emitWave('user',userEnergy,timestamp);lastUserEmission=timestamp}
     if(assistantEnergy>.035&&timestamp-lastAssistantEmission>mix(900,380,assistantEnergy)){emitWave('assistant',assistantEnergy,timestamp);lastAssistantEmission=timestamp}
-    advanceWaves(userWaves,1,parameters.userWavePropagationSpeed,parameters.userWaveDecay,deltaSeconds)
-    advanceWaves(assistantWaves,-1,parameters.assistantWavePropagationSpeed,parameters.assistantWaveDecay,deltaSeconds)
+    advanceWaves(userWaves,-1,parameters.userWavePropagationSpeed,parameters.userWaveDecay,deltaSeconds)
+    advanceWaves(assistantWaves,1,parameters.assistantWavePropagationSpeed,parameters.assistantWaveDecay,deltaSeconds)
   }
   function waveAt(waves,row,column,columns){
     var total=0,x=(column+.5)/columns

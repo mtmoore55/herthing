@@ -17,6 +17,7 @@
     clock: { utc_offset_minutes: 0 },
     weather: null,
     next_event: null,
+    today_events: [],
     now_playing: null,
     microphone: { mode: 'off', activity: 'idle' }
   }
@@ -140,18 +141,22 @@
       : minutes > -60 ? 'started ' + Math.abs(minutes) + ' min ago' : ''
   }
 
-  function symbolFor(value) {
+  function weatherIcon(value) {
     var text = String(value || '').toLowerCase()
-    if (text.indexOf('rain') >= 0) return '☂'
-    if (text.indexOf('cloud') >= 0) return '☁'
-    if (text.indexOf('snow') >= 0) return '✣'
-    if (text.indexOf('clear') >= 0 || text.indexOf('sun') >= 0) return '☀'
-    return '◌'
+    var common = 'viewBox="0 0 32 32" role="img" aria-hidden="true"'
+    if (text.indexOf('thunder') >= 0 || text.indexOf('storm') >= 0) return '<svg ' + common + '><path d="M8 21a6 6 0 0 1 1-11.9A8 8 0 0 1 24.6 12 4.7 4.7 0 0 1 24 21H8Z"/><path class="weather-accent" d="m17 19-4 7h4l-2 5 7-9h-4l2-3Z"/></svg>'
+    if (text.indexOf('rain') >= 0 || text.indexOf('shower') >= 0 || text.indexOf('drizzle') >= 0) return '<svg ' + common + '><path d="M8 19a6 6 0 0 1 1-11.9A8 8 0 0 1 24.6 10 4.7 4.7 0 0 1 24 19H8Z"/><path class="weather-accent" d="m10 23-2 5m8-5-2 5m8-5-2 5"/></svg>'
+    if (text.indexOf('snow') >= 0 || text.indexOf('flurr') >= 0) return '<svg ' + common + '><path d="M8 18a6 6 0 0 1 1-11.9A8 8 0 0 1 24.6 9 4.7 4.7 0 0 1 24 18H8Z"/><path class="weather-accent" d="M10 23h4m-2-2v4m6-2h4m-2-2v4m-7 4h4m-2-2v4"/></svg>'
+    if (text.indexOf('fog') >= 0 || text.indexOf('mist') >= 0 || text.indexOf('haze') >= 0) return '<svg ' + common + '><path d="M8 17a6 6 0 0 1 1-11.9A8 8 0 0 1 24.6 8 4.7 4.7 0 0 1 24 17H8Z"/><path class="weather-accent" d="M5 22h22M8 27h16"/></svg>'
+    if (text.indexOf('partly') >= 0) return '<svg ' + common + '><circle class="weather-accent" cx="11" cy="10" r="5"/><path class="weather-accent" d="M11 2V0m0 20v-2M3 10H1m20 0h-2M5.3 4.3 3.9 2.9m14.2 14.2-1.4-1.4m0-11.4 1.4-1.4M3.9 17.1l1.4-1.4"/><path d="M8 25a6 6 0 0 1 1-11.9A8 8 0 0 1 24.6 16 4.7 4.7 0 0 1 24 25H8Z"/></svg>'
+    if (text.indexOf('cloud') >= 0 || text.indexOf('overcast') >= 0) return '<svg ' + common + '><path d="M7 23a7 7 0 0 1 1.2-13.9A9 9 0 0 1 25.7 12 5.5 5.5 0 0 1 25 23H7Z"/></svg>'
+    if (text.indexOf('clear') >= 0 || text.indexOf('sun') >= 0) return '<svg ' + common + '><circle cx="16" cy="16" r="6"/><path d="M16 4V1m0 30v-3M4 16H1m30 0h-3M7.5 7.5 5.4 5.4m21.2 21.2-2.1-2.1m0-17 2.1-2.1M5.4 26.6l2.1-2.1"/></svg>'
+    return '<svg ' + common + '><circle cx="16" cy="16" r="10"/><path d="M16 10v7m0 5v1"/></svg>'
   }
 
   function renderWeather() {
     var weather = state.weather
-    $('weather-symbol').textContent = weather ? symbolFor(weather.symbol || weather.condition) : '—'
+    $('weather-symbol').innerHTML = weather ? weatherIcon(weather.symbol || weather.condition) : ''
     $('temperature').textContent = weather ? Math.round(weather.temperature) + '°' : '--°'
     $('condition').textContent = weather ? weather.condition : 'Weather unavailable'
   }
@@ -165,6 +170,23 @@
     $('event-time').textContent = formatTime(new Date(event.starts_at))
     $('event-location').textContent = event.location || ''
     renderEventRelative(new Date(Date.now() + hostClockSkewMs))
+  }
+
+  function renderAgenda() {
+    var events = state.today_events || []
+    var list = $('agenda-list')
+    if (!events.length) { list.innerHTML = '<div class="agenda-empty">Nothing else on your calendar today.</div>'; return }
+    list.innerHTML = events.map(function (event) {
+      var time = event.all_day ? 'ALL DAY' : formatTime(new Date(event.starts_at))
+      var location = event.location ? '<span>' + escapeHtml(event.location) + '</span>' : ''
+      return '<article class="agenda-item"><time class="agenda-time">' + time + '</time><div class="agenda-copy"><strong>' + escapeHtml(event.title) + '</strong>' + location + '</div></article>'
+    }).join('')
+  }
+
+  function escapeHtml(value) {
+    var element = document.createElement('span')
+    element.textContent = String(value || '')
+    return element.innerHTML
   }
 
   function formatDuration(milliseconds) {
@@ -227,7 +249,7 @@
     responseTimer = setTimeout(function () { element.classList.remove('visible') }, 6500)
   }
 
-  function render() { renderWeather(); renderEvent(); renderTrack(); renderMicrophone(); renderResponse(); renderAttention(new Date(Date.now() + hostClockSkewMs)) }
+  function render() { renderWeather(); renderEvent(); renderAgenda(); renderTrack(); renderMicrophone(); renderResponse(); renderAttention(new Date(Date.now() + hostClockSkewMs)) }
 
   function showToast(text) {
     $('toast').textContent = text
@@ -271,7 +293,11 @@
 
   window.addEventListener('pointerdown', function (event) {
     var command = event.target.closest('[data-command]')
-    if (command) { event.preventDefault(); sendCommand(command.dataset.command); return }
+    if (command) { event.preventDefault(); sendCommand(command.dataset.command); showToast(command.getAttribute('aria-label') || 'MEDIA'); return }
+    var viewCommand = event.target.closest('[data-view-command]')
+    if (viewCommand) { event.preventDefault(); setView(viewCommand.dataset.viewCommand); return }
+    var panel = event.target.closest('[data-panel]')
+    if (panel) { event.preventDefault(); setView(panel.dataset.panel === 'spotify' ? 'spotify' : 'calendar'); return }
     sendInput('touch', { x: Math.round(event.clientX), y: Math.round(event.clientY) })
   })
 
@@ -282,6 +308,7 @@
     $('assistant-response').classList.remove('visible')
     state.weather = { temperature: 71, condition: 'Clear', symbol: 'sun' }
     state.next_event = { title: 'Design Review', starts_at: new Date(Date.now() + minutes * 60000).toISOString(), location: 'Studio' }
+    state.today_events = [state.next_event, { title: 'Dinner with Andy', starts_at: new Date(Date.now() + (minutes + 120) * 60000).toISOString(), location: 'Downtown' }]
     state.microphone = { mode: mode === 'off' ? 'off' : 'ambient', activity: 'idle' }
     if (mode.indexOf('music') >= 0 || mode === 'track') {
       state.now_playing = { track: 'Everything in Its Right Place', artist: 'Radiohead', album: 'Kid A', art_url: null, duration_ms: 251000, position_ms: 137000, playing: true }
@@ -366,6 +393,7 @@
   if (parameters.has('hour')) visualHourOverride = Math.max(0, Math.min(23.99, Number(parameters.get('hour')) || 0))
   if (demoMode) enableDemo(demoMode, parameters.get('minutes'))
   if (debugMode) enableDemo('ambient', 180)
+  if (parameters.get('view')) dashboard.dataset.view = parameters.get('view')
   tick(); render(); setInterval(tick, 1000)
   if (debugMode) buildDebugLab()
   if (!demoMode && !debugMode) connect()

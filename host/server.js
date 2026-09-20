@@ -1,5 +1,5 @@
 import { fetchWeather, weatherConfig } from './weather.js'
-import { calendarConfig, fetchNextEvent } from './calendar.js'
+import { calendarConfig, fetchCalendarState } from './calendar.js'
 import { executeMediaCommand, readNowPlaying } from './media-player.js'
 import { setSystemVolume } from './system-volume.js'
 import { createPcmEnergyAnalyzer, createSpeechEndpointDetector } from './microphone-audio.js'
@@ -7,6 +7,7 @@ import { transcribeS32le } from './stt-whisper.js'
 import { askAssistant, assistantConfig, resetAssistantConversation } from './assistant.js'
 import { museBrowserHealth } from './muse-browser.js'
 import { cancelSpeech, speak, speechConfig } from './speech.js'
+import { extractWakeCommand, isSleepIntent } from './conversation-intents.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
@@ -15,19 +16,22 @@ const deviceControlUrl = process.env.HERTHING_DEVICE_CONTROL_URL || 'http://172.
 const clients = new Set()
 let activeMicrophoneStream = null
 const conversationTimeoutMs = Number(process.env.HERTHING_CONVERSATION_TIMEOUT_MS || 3 * 60 * 1000)
-const followupDelayMs = Number(process.env.HERTHING_FOLLOWUP_DELAY_MS || 800)
+const followupDelayMs = Number(process.env.HERTHING_FOLLOWUP_DELAY_MS || 300)
 const noSpeechCycleMs = Number(process.env.HERTHING_NO_SPEECH_CYCLE_MS || 15000)
 let conversationActive = false
 let conversationExpiresAt = 0
 let conversationGeneration = 0
 let followupTimer = null
+let ambientTimer = null
+let microphoneEnabled = true
 
 let revision = 1
 let state = {
   weather: null,
   next_event: null,
+  today_events: [],
   now_playing: null,
-  microphone: { mode: 'off', activity: 'idle' },
+  microphone: { mode: 'ambient', activity: 'idle' },
   conversation: { active: false, expires_at: null },
   transcript: null,
   assistant_response: null
@@ -76,6 +80,7 @@ function mergeState(patch) {
   const allowed = [
     'weather',
     'next_event',
+    'today_events',
     'now_playing',
     'microphone',
     'conversation',
@@ -105,20 +110,40 @@ function extendConversation() {
 
 function beginConversation() {
   clearTimeout(followupTimer)
+  clearTimeout(ambientTimer)
   conversationGeneration += 1
   conversationActive = true
+  microphoneEnabled = true
   resetAssistantConversation()
   extendConversation()
 }
 
-function endConversation() {
+function endConversation({ returnToAmbient = true } = {}) {
   clearTimeout(followupTimer)
+  clearTimeout(ambientTimer)
   cancelSpeech()
   conversationGeneration += 1
   conversationActive = false
   conversationExpiresAt = 0
+  microphoneEnabled = returnToAmbient
   publishConversation()
-  mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
+  mergeState({ microphone: { mode: returnToAmbient ? 'ambient' : 'off', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
+  if (returnToAmbient) scheduleAmbient()
+}
+
+function scheduleAmbient(delayMs = 300) {
+  clearTimeout(ambientTimer)
+  if (!microphoneEnabled || conversationActive || activeMicrophoneStream) return
+  ambientTimer = setTimeout(async () => {
+    if (!microphoneEnabled || conversationActive || activeMicrophoneStream) return
+    try {
+      mergeState({ microphone: { mode: 'ambient', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
+      await controlMicrophone('start')
+    } catch (error) {
+      console.error('[ambient] capture failed:', error.message || error)
+      scheduleAmbient(2000)
+    }
+  }, delayMs)
 }
 
 function scheduleFollowup() {
@@ -175,8 +200,8 @@ async function refreshWeather() {
 async function refreshCalendar() {
   if (!configuredCalendar) return
   try {
-    mergeState({ next_event: await fetchNextEvent(configuredCalendar) })
-    console.log('[calendar] next event refreshed')
+    mergeState(await fetchCalendarState(configuredCalendar))
+    console.log('[calendar] today agenda refreshed')
   } catch (error) {
     console.error('[calendar] refresh failed:', error.message || error)
   }
@@ -215,6 +240,7 @@ const server = Bun.serve({
       if (activeMicrophoneStream) return Response.json({ error: 'microphone stream already active' }, { status: 409 })
       const streamId = crypto.randomUUID()
       activeMicrophoneStream = streamId
+      const ambientStream = !conversationActive
       const analyzer = createPcmEnergyAnalyzer()
       const endpointDetector = createSpeechEndpointDetector()
       const reader = request.body.getReader()
@@ -227,7 +253,7 @@ const server = Bun.serve({
       let noSpeechTimeout = false
       const audioChunks = []
       mergeState({
-        microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 },
+        microphone: { mode: ambientStream ? 'ambient' : 'conversation', activity: ambientStream ? 'idle' : 'listening', user_energy: 0 },
         transcript: null,
         assistant_response: null
       })
@@ -246,17 +272,17 @@ const server = Bun.serve({
           const now = performance.now()
           if (!autoStopRequested && endpoint.endpoint) {
             autoStopRequested = true
-            mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
+            if (!ambientStream) mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
             console.log(`[vad] speech endpoint after ${Math.round(bytes / (16000 * 4) * 1000)} ms`)
             controlMicrophone('stop').catch((error) => console.error('[vad] auto-stop failed:', error.message || error))
           }
           if (!autoStopRequested && !speechDetected && bytes >= 16000 * 4 * noSpeechCycleMs / 1000) {
             autoStopRequested = true
             noSpeechTimeout = true
-            console.log(`[conversation] no speech in ${noSpeechCycleMs} ms; cycling capture`)
+            console.log(`[${ambientStream ? 'ambient' : 'conversation'}] no speech in ${noSpeechCycleMs} ms; cycling capture`)
             controlMicrophone('stop').catch((error) => console.error('[conversation] capture cycle failed:', error.message || error))
           }
-          if (!autoStopRequested && measurement.samples && now - lastBroadcast >= 75) {
+          if (!ambientStream && !autoStopRequested && measurement.samples && now - lastBroadcast >= 75) {
             lastBroadcast = now
             mergeState({ microphone: {
               mode: 'conversation',
@@ -272,14 +298,25 @@ const server = Bun.serve({
         let transcription = null
         let assistant = null
         if (!noSpeechTimeout && speechDetected && bytes >= 16000 * 4 * 0.4) {
-          mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
+          if (!ambientStream) mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
           try {
             transcription = await transcribeS32le(Buffer.concat(audioChunks.map((chunk) => Buffer.from(chunk))))
-            mergeState({ transcript: transcription.text || null })
-            console.log(`[stt] ${transcription.elapsed_ms} ms: ${transcription.text}`)
-            if (transcription.text) {
+            console.log(`[stt:${ambientStream ? 'ambient' : 'conversation'}] ${transcription.elapsed_ms} ms: ${transcription.text}`)
+            const wake = ambientStream ? extractWakeCommand(transcription.text) : null
+            const spokenRequest = ambientStream ? wake?.command : transcription.text
+            if (ambientStream && wake) {
+              console.log(`[wake] Ziggy${spokenRequest ? `: ${spokenRequest}` : ''}`)
+              beginConversation()
+              mergeState({ transcript: spokenRequest || 'Ziggy', microphone: { mode: 'conversation', activity: spokenRequest ? 'thinking' : 'idle', user_energy: 0 } })
+            } else if (!ambientStream) {
+              mergeState({ transcript: transcription.text || null })
+            }
+            if (!ambientStream && transcription.text && isSleepIntent(transcription.text)) {
+              console.log(`[conversation] sleep intent: ${transcription.text}`)
+              endConversation()
+            } else if (spokenRequest) {
               extendConversation()
-              assistant = await askAssistant(transcription.text, state)
+              assistant = await askAssistant(spokenRequest, state)
               if (conversationActive) {
                 mergeState({
                   assistant_response: assistant.text,
@@ -302,7 +339,10 @@ const server = Bun.serve({
         if (conversationActive && !activeMicrophoneStream) {
           mergeState({ microphone: { mode: 'conversation', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
           scheduleFollowup()
-        } else if (!conversationActive) {
+        } else if (microphoneEnabled) {
+          mergeState({ microphone: { mode: 'ambient', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
+          scheduleAmbient()
+        } else {
           mergeState({ microphone: { mode: 'off', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
         }
       }
@@ -358,21 +398,35 @@ const server = Bun.serve({
             send(ws, envelope('ack', { reply_to: message.id }))
             return
           }
-          const exiting = message.input === 'preset_4' || conversationActive
-          const action = exiting ? 'off' : 'start'
-          if (exiting) endConversation()
-          else {
+          if (message.input === 'preset_4') {
+            if (microphoneEnabled) {
+              endConversation({ returnToAmbient: false })
+              controlMicrophone('off').catch((error) => console.error('[microphone] off failed:', error.message || error))
+            } else {
+              microphoneEnabled = true
+              mergeState({ microphone: { mode: 'ambient', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
+              scheduleAmbient(0)
+            }
+            send(ws, envelope('ack', { reply_to: message.id }))
+            return
+          }
+          if (conversationActive) {
+            endConversation()
+            controlMicrophone('off').catch((error) => console.error('[microphone] conversation exit failed:', error.message || error))
+          } else {
             beginConversation()
             mergeState({
               microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 },
               transcript: null,
               assistant_response: null
             })
+            // Ambient capture may already own the device. Stop it first so
+            // the replacement stream is classified as conversational.
+            controlMicrophone('off').then(() => controlMicrophone('start')).catch((error) => {
+              console.error('[microphone] control failed:', error.message || error)
+              endConversation()
+            })
           }
-          controlMicrophone(action).catch((error) => {
-            console.error('[microphone] control failed:', error.message || error)
-            endConversation()
-          })
         }
         send(ws, envelope('ack', { reply_to: message.id }))
         return
@@ -405,6 +459,7 @@ const server = Bun.serve({
 console.log(`HerThing host ${protocol} listening on http://${server.hostname}:${server.port}`)
 console.log(`[assistant] provider: ${assistantConfig().provider}`)
 console.log(`[tts] ${speechConfig().enabled ? 'enabled' : 'disabled'}`)
+scheduleAmbient(1000)
 if (configuredWeather) {
   refreshWeather()
   setInterval(refreshWeather, 10 * 60 * 1000)
