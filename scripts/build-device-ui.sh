@@ -10,7 +10,7 @@ mkdir -p "$output_dir"
 rm -f "$output_file"
 (
   cd "$source_dir"
-  zip -q -9 "$output_file" index.html styles.css app.js
+  zip -q -9 "$output_file" index.html styles.css app.js visuals.js fonts/*.woff2 fonts/*.txt
 )
 
 echo "$output_file"

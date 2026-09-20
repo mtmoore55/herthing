@@ -12,6 +12,7 @@
   var volume = 50
   var hostClockSkewMs = 0
   var eventUrgency = 0
+  var visualHourOverride = null
   var state = {
     clock: { utc_offset_minutes: 0 },
     weather: null,
@@ -104,6 +105,7 @@
     var weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
     var months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
     $('date').textContent = weekdays[wallClock.getUTCDay()] + ' · ' + months[wallClock.getUTCMonth()] + ' ' + wallClock.getUTCDate()
+    if (window.HerThingVisuals) window.HerThingVisuals.setTimeOfDay(visualHourOverride == null ? wallClock.getUTCHours() + wallClock.getUTCMinutes() / 60 : visualHourOverride)
     renderEventRelative(now)
     renderAttention(now)
   }
@@ -187,7 +189,7 @@
     $('play-button').textContent = track.playing ? 'Ⅱ' : '▶'
     $('track-progress').style.width = (track.duration_ms ? Math.min(100, track.position_ms / track.duration_ms * 100) : 0) + '%'
     if (track.art_url && $('album-art').src !== track.art_url) $('album-art').src = track.art_url
-    if (window.HerThingVisuals) window.HerThingVisuals.setArtwork(track.art_url || track.track)
+    if (window.HerThingVisuals) window.HerThingVisuals.setArtwork(track.art_url || track.track, track.playing)
   }
 
   function renderMicrophone() {
@@ -296,15 +298,17 @@
     var paused = false
     var lab = document.createElement('div')
     lab.className = 'debug-lab'
-    lab.innerHTML = '<header><strong>HERTHING VISUAL WORKBENCH</strong><span id="debug-fps">-- FPS</span></header><label>Scenario</label><select id="debug-scenario"><option>dormant</option><option>event-180</option><option>event-60</option><option>event-30</option><option>event-10</option><option>event-now</option><option>music</option><option>track-transition</option><option>user</option><option>assistant</option><option>music-user</option><option>music-assistant</option><option>imminent-music</option><option>imminent-conversation</option><option>off</option></select><div class="debug-gallery"><button data-scene="dormant">REST</button><button data-scene="music">MUSIC</button><button data-scene="music-user">YOU</button><button data-scene="music-assistant">HERTHING</button><button data-scene="event-10">10 MIN</button><button data-scene="off">MIC OFF</button></div><label>Minutes until event <b id="debug-minutes-value">180</b></label><input id="debug-minutes" type="range" min="-10" max="180" value="180"><label>User energy <b id="debug-user-value">0</b></label><input id="debug-user" type="range" min="0" max="100" value="0"><label>Assistant energy <b id="debug-assistant-value">0</b></label><input id="debug-assistant" type="range" min="0" max="100" value="0"><label>Motion intensity <b id="debug-intensity-value">100%</b></label><input id="debug-intensity" type="range" min="0" max="200" value="100"><label>Motion speed</label><select id="debug-speed"><option value=".1">0.1× study</option><option value=".5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select><div class="debug-actions"><button id="debug-pause">PAUSE</button><button id="debug-clean">CLEAN VIEW</button></div><label>Test palette / transition</label><div class="debug-actions"><button data-palette="ember">EMBER</button><button data-palette="marine">MARINE</button><button data-palette="acid">ACID</button></div><label>Compare / share</label><div class="debug-actions"><button data-save="a">SAVE A</button><button data-load="a">LOAD A</button><button data-save="b">SAVE B</button><button data-load="b">LOAD B</button><button id="debug-export">EXPORT JSON</button></div><small>Press D to show/hide this panel.</small>'
+    lab.innerHTML = '<header><strong>HERTHING VISUAL WORKBENCH</strong><span id="debug-fps">-- FPS</span></header><label>Scenario</label><select id="debug-scenario"><option>dormant</option><option>event-180</option><option>event-60</option><option>event-30</option><option>event-10</option><option>event-now</option><option>music</option><option>track-transition</option><option>user</option><option>assistant</option><option>music-user</option><option>music-assistant</option><option>imminent-music</option><option>imminent-conversation</option><option>off</option></select><div class="debug-gallery"><button data-scene="dormant">REST</button><button data-scene="music">MUSIC</button><button data-scene="music-user">YOU</button><button data-scene="music-assistant">HERTHING</button><button data-scene="event-10">10 MIN</button><button data-scene="off">MIC OFF</button></div><label>Minutes until event <b id="debug-minutes-value">180</b></label><input id="debug-minutes" type="range" min="-10" max="180" value="180"><label>User energy <b id="debug-user-value">0</b></label><input id="debug-user" type="range" min="0" max="100" value="0"><label>Assistant energy <b id="debug-assistant-value">0</b></label><input id="debug-assistant" type="range" min="0" max="100" value="0"><label>Motion intensity <b id="debug-intensity-value">100%</b></label><input id="debug-intensity" type="range" min="0" max="200" value="100"><label>Cell softness <b id="debug-softness-value">58%</b></label><input id="debug-softness" type="range" min="0" max="100" value="58"><label>Glow <b id="debug-glow-value">42%</b></label><input id="debug-glow" type="range" min="0" max="100" value="42"><label>Wave speed <b id="debug-wave-speed-value">100%</b></label><input id="debug-wave-speed" type="range" min="40" max="180" value="100"><label>Wave decay <b id="debug-wave-decay-value">90%</b></label><input id="debug-wave-decay" type="range" min="40" max="97" value="90"><label>Brightness <b id="debug-brightness-value">118%</b></label><input id="debug-brightness" type="range" min="35" max="160" value="118"><label>Motion speed</label><select id="debug-speed"><option value=".1">0.1× study</option><option value=".5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select><div class="debug-actions"><button id="debug-pause">PAUSE</button><button id="debug-clean">CLEAN VIEW</button></div><label>Test palette / transition</label><div class="debug-actions"><button data-palette="ember">EMBER</button><button data-palette="marine">MARINE</button><button data-palette="acid">ACID</button></div><label>Compare / share</label><div class="debug-actions"><button data-save="a">SAVE A</button><button data-load="a">LOAD A</button><button data-save="b">SAVE B</button><button data-load="b">LOAD B</button><button id="debug-export">EXPORT JSON</button></div><small>Press D to show/hide this panel.</small>'
     document.body.appendChild(lab)
     var palettes = { ember: [[68,23,16],[190,72,34],[91,28,55],[220,145,70]], marine: [[8,37,48],[23,105,117],[30,53,91],[111,166,153]], acid: [[27,34,18],[145,183,38],[184,73,28],[66,36,94]] }
-    function settings() { return { scenario:$('debug-scenario').value, minutes:Number($('debug-minutes').value), userEnergy:Number($('debug-user').value), assistantEnergy:Number($('debug-assistant').value), intensity:Number($('debug-intensity').value), speed:Number($('debug-speed').value), paused:paused } }
+    function settings() { return { scenario:$('debug-scenario').value, minutes:Number($('debug-minutes').value), userEnergy:Number($('debug-user').value), assistantEnergy:Number($('debug-assistant').value), intensity:Number($('debug-intensity').value), softness:Number($('debug-softness').value), glow:Number($('debug-glow').value), waveSpeed:Number($('debug-wave-speed').value), waveDecay:Number($('debug-wave-decay').value), brightness:Number($('debug-brightness').value), speed:Number($('debug-speed').value), paused:paused } }
     function applySettings(value) {
       if (!value) return
       $('debug-scenario').value = value.scenario || 'dormant'; $('debug-minutes').value = value.minutes == null ? 180 : value.minutes
       $('debug-user').value = value.userEnergy || 0; $('debug-assistant').value = value.assistantEnergy || 0
       $('debug-intensity').value = value.intensity == null ? 100 : value.intensity; $('debug-speed').value = String(value.speed || 1)
+      $('debug-softness').value = value.softness == null ? 58 : value.softness; $('debug-glow').value = value.glow == null ? 42 : value.glow
+      $('debug-wave-speed').value = value.waveSpeed == null ? 100 : value.waveSpeed; $('debug-wave-decay').value = value.waveDecay == null ? 90 : value.waveDecay; $('debug-brightness').value = value.brightness == null ? 118 : value.brightness
       paused = !!value.paused; userOverride = Number($('debug-user').value) / 100; assistantOverride = Number($('debug-assistant').value) / 100
       update()
     }
@@ -321,6 +325,8 @@
       $('debug-user-value').textContent = $('debug-user').value
       $('debug-assistant-value').textContent = $('debug-assistant').value
       $('debug-intensity-value').textContent = $('debug-intensity').value + '%'
+      $('debug-softness-value').textContent = $('debug-softness').value + '%'; $('debug-glow-value').textContent = $('debug-glow').value + '%'
+      $('debug-wave-speed-value').textContent = $('debug-wave-speed').value + '%'; $('debug-wave-decay-value').textContent = $('debug-wave-decay').value + '%'; $('debug-brightness-value').textContent = $('debug-brightness').value + '%'
       enableDemo(scenario === 'dormant' ? 'ambient' : scenario, minutes)
       if (scenario.indexOf('imminent') === 0) state.next_event.starts_at = new Date(Date.now() + 10 * 60000).toISOString()
       if (scenario === 'imminent-music') state.now_playing = { track:'Antidote', artist:'Travis Scott', duration_ms:252000, position_ms:91000, playing:true }
@@ -331,7 +337,7 @@
       }
       if (userOverride !== null) state.microphone.user_energy = userOverride
       if (assistantOverride !== null) state.microphone.assistant_energy = assistantOverride
-      if (window.HerThingVisuals) window.HerThingVisuals.setTuning({ paused:paused, speed:Number($('debug-speed').value), intensity:Number($('debug-intensity').value)/100 })
+      if (window.HerThingVisuals) window.HerThingVisuals.setTuning({ paused:paused, speed:Number($('debug-speed').value), intensity:Number($('debug-intensity').value)/100, cellSoftness:Number($('debug-softness').value)/100, glow:Number($('debug-glow').value)/100, userWavePropagationSpeed:3.3*Number($('debug-wave-speed').value)/100, assistantWavePropagationSpeed:2.75*Number($('debug-wave-speed').value)/100, userWaveDecay:Number($('debug-wave-decay').value)/100, assistantWaveDecay:Number($('debug-wave-decay').value)/100, overallBrightness:Number($('debug-brightness').value)/100 })
       $('debug-pause').textContent = paused ? 'PLAY' : 'PAUSE'
       render()
     }
@@ -357,6 +363,7 @@
   var parameters = new URLSearchParams(window.location.search)
   var demoMode = parameters.get('demo')
   var debugMode = parameters.get('debug') === '1'
+  if (parameters.has('hour')) visualHourOverride = Math.max(0, Math.min(23.99, Number(parameters.get('hour')) || 0))
   if (demoMode) enableDemo(demoMode, parameters.get('minutes'))
   if (debugMode) enableDemo('ambient', 180)
   tick(); render(); setInterval(tick, 1000)

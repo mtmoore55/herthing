@@ -3,9 +3,9 @@
 HerThing renders one continuous visual world rather than switching between
 dashboard, music, and voice pages. The DOM is a sparse semantic information
 layer over a dependency-free Canvas 2D field. That field is a deliberately
-low-resolution 20×12 grid of flat color facets: broad overlapping influences
-produce stepped linear, radial, and diamond-like structures without blurring or
-enlarging the source artwork.
+low-resolution 20×12 grid of atmospheric rectangular cells. Broad, diffused
+light fields preserve the cells while preventing the result from reading as an
+equalizer or literal pixel art.
 
 HerThing bundles Cal Sans v2 rather than depending on host fonts. Cal Sans is
 used at display optical sizes for the clock, events, track titles, weather, and
@@ -29,11 +29,24 @@ to the font assets.
   background energy, and how much Conditions and music yield.
 
 Album changes interpolate the current palette and the grid continuously toward
-the new visual world. Grid origins drift at incommensurate rates, while a pair
-of low-frequency pulses changes luminance without creating an obvious loop.
-User voice energy enters as a warm left-origin pressure field; assistant energy
-enters as a cool right-origin field. Both illuminate and recolor existing
-facets, so they compose over music instead of replacing it.
+the new visual world. The base palette interpolates continuously from muted
+rose, peach, amber, and violet during the day to midnight blue, indigo, violet,
+and restrained cyan at night. Slow incommensurate fields move across it on the
+scale of many seconds.
+
+Voice is modeled as independent impulses in a small row-based simulation. User
+energy enters at the top in warm pink and travels downward; HerThing energy
+enters at the bottom in cyan and blue-violet and travels upward. Amplitude
+controls each wave's brightness and depth. The impulses can coexist and blend,
+so rapid turn-taking emerges from the model rather than invoking a canned
+conversation animation. There are no waveform or orb elements.
+
+The renderer is split conceptually into low-frequency inputs, animation
+simulation, and cell rendering. `HerThingVisuals.setTuning()` exposes grid
+dimensions, softness, glow, idle speed/intensity, both wave speeds/decays and
+sensitivities, music response, album influence, day/night interpolation, and
+overall brightness. The development workbench exposes the highest-value visual
+controls directly.
 
 ## Development previews
 
@@ -69,7 +82,8 @@ Workbench controls include:
 
 - a compact scenario gallery and full scenario picker;
 - continuous event-minutes, user-energy, and assistant-energy controls;
-- pause, 0.1×/0.5×/1×/2× study speeds, and motion-intensity control;
+- pause, study speed, motion, cell softness, glow, voice-wave, and brightness
+  controls;
 - live renderer FPS and palette-transition triggers;
 - two browser-local A/B slots and portable JSON preset export;
 - `CLEAN VIEW`, with the `D` key restoring or hiding the controls.
@@ -91,9 +105,11 @@ history. Microphone status lives outside this hierarchy and never disappears.
 
 ## Performance
 
-The scene renders internally at 160x96 and scales to 800x480. Soft color fields
-are cached textures; palette textures rebuild only during slow transitions.
-Scene evolution runs at 12 Hz because motion is deliberately slow and the
+The scene renders internally at 160x96 and scales to 800x480. Scene evolution
+runs at 12 Hz because motion is deliberately slow and the
 Car Thing's legacy Chromium software compositor remains CPU-heavy regardless of
 Canvas paint frequency. Voice-to-visual response remains below one scene frame
-(about 80 ms). Application state is never updated per animation frame.
+(about 80 ms). Application state is never updated per animation frame. Design
+references live at `docs/design/ambient-grid-v1.png` and
+`docs/design/ambient-grid-v2.png`; v2 establishes direction rather than a
+pixel-perfect UI specification.

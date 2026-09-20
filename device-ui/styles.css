@@ -7,8 +7,8 @@
 :root { color-scheme:dark; font-family:CalText,Arial,sans-serif; background:#0a0a09; color:#f2efe8; font-synthesis:none; }
 * { box-sizing: border-box; } html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; } body { background: #0a0a09; } button { font: inherit; }
 .world { --conditions-opacity:1; --event-opacity:.55; --event-size:28px; --event-shift:0px; --event-detail-opacity:1; --event-kicker-size:10px; --music-opacity:1; isolation: isolate; position: relative; width: 100vw; height: 100vh; overflow: hidden; padding: 26px 30px 20px; background: #0a0a09; }
-#visual-field { position:absolute; z-index:-4; inset:0; width:100%; height:100%; image-rendering:pixelated; filter:saturate(1.08); transform:scale(1.025); }
-.veil { position: absolute; z-index: -3; inset: 0; background: linear-gradient(90deg,rgba(7,7,6,.72),rgba(7,7,6,.14) 55%,rgba(7,7,6,.36)),linear-gradient(0deg,rgba(7,7,6,.74),transparent 45%); transition: opacity 1.8s ease; }
+#visual-field { position:absolute; z-index:-4; inset:0; width:100%; height:100%; image-rendering:pixelated; filter:saturate(1.08) blur(.35px); transform:scale(1.025); }
+.veil { position: absolute; z-index: -3; inset: 0; background: linear-gradient(90deg,rgba(7,7,6,.52),rgba(7,7,6,.08) 55%,rgba(7,7,6,.25)),linear-gradient(0deg,rgba(7,7,6,.48),transparent 48%); transition: opacity 1.8s ease; }
 .grain { position:absolute; z-index:-2; inset:-40%; opacity:.035; pointer-events:none; background-image:repeating-radial-gradient(circle at 19% 28%,transparent 0,rgba(255,255,255,.7) .55px,transparent 1.1px,transparent 4px); transform:rotate(8deg); }
 .topline { display:flex; align-items:flex-start; justify-content:space-between; opacity:var(--conditions-opacity); transform:translateY(calc(var(--event-shift) * -.18)); transition:opacity 1.2s ease,transform 1.8s cubic-bezier(.2,.7,.2,1); } .clock-wrap { display:flex; align-items:baseline; gap:15px; }
 #clock { font-family:CalDisplay,Arial,sans-serif; font-size:72px; line-height:.82; font-weight:500; letter-spacing:-.035em; word-spacing:.1em; font-variant-numeric:tabular-nums; text-shadow:0 2px 28px rgba(0,0,0,.3); }
