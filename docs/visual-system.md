@@ -23,6 +23,12 @@ changes. A 2.2-second mask interpolation lets the field reorganize between
 minutes. The renderer runs on `requestAnimationFrame`; high-frequency animation
 never passes through application DOM state.
 
+The production hybrid treatment is deliberately binary: cells belonging to the
+clock are pure black, while neighboring cells remain ordinary members of the
+ambient field. The renderer does not outline, tint, brighten, or displace the
+clock boundary. Minute morphs reorganize which cells are absent rather than
+cross-fading the numeral through muddy intermediate shades.
+
 HerThing bundles Cal Sans v2 rather than depending on host fonts. Cal Sans is
 used at display optical sizes for the clock, events, track titles, weather, and
 ephemeral assistant language. Cal Sans Text UI handles compact metadata and
