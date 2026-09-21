@@ -1,0 +1,17 @@
+{
+  "intent": {
+    "type": "choice",
+    "instructions": "Classify one transcribed HerThing voice request. Choose a direct action only when the speaker clearly asks HerThing to do exactly that now. Negated, quoted, hypothetical, ambiguous, unsupported, parameterized, or multiple requests must not execute directly.",
+    "criteria": {
+      "pause_music": "explicitly pause or stop the currently playing music now",
+      "resume_music": "explicitly resume or continue paused music now",
+      "next_track": "explicitly skip the current song and play the next track now",
+      "volume_up": "explicitly raise the current system audio volume without specifying an exact level",
+      "volume_down": "explicitly lower the current system audio volume without specifying an exact level",
+      "next_calendar_event": "ask HerThing to read the next calendar event",
+      "current_weather": "ask HerThing to report current local weather",
+      "conversation": "general conversation or a supported question that should use the conversational assistant",
+      "fallback": "ambiguous, negated, quoted, hypothetical, unsupported, multi-intent, or requires clarification"
+    }
+  }
+}

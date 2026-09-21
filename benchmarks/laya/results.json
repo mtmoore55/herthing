@@ -1,0 +1,365 @@
+{
+  "environment": {
+    "cpu": "Intel Core i5-3210M",
+    "cores": 2,
+    "threads": 4,
+    "torch": "2.14.0+cpu",
+    "torch_threads": 2,
+    "model": "/home/mttmr/herthing/.artifacts/models/laya-english-1c5edc17"
+  },
+  "load_seconds": 80.724,
+  "peak_rss_mib": 2889.4,
+  "warm_latency_ms": {
+    "p50": 6005.2,
+    "p95": 11622.7,
+    "min": 4858.1,
+    "max": 13038.8
+  },
+  "input_limit": {
+    "configured": 512,
+    "long_input_tokens_used": 512
+  },
+  "laya": {
+    "accuracy": 0.40625,
+    "correct": 13,
+    "total": 32,
+    "incorrect_direct_actions": 15,
+    "fallback_rate": 0.0
+  },
+  "gated_laya": {
+    "accuracy": 0.6875,
+    "correct": 22,
+    "total": 32,
+    "incorrect_direct_actions": 0,
+    "fallback_rate": 0.75
+  },
+  "simple_rules": {
+    "accuracy": 0.875,
+    "correct": 28,
+    "total": 32,
+    "incorrect_direct_actions": 0,
+    "fallback_rate": 0.5625
+  },
+  "cases": [
+    {
+      "id": "pause-1",
+      "text": "could you pause this for me",
+      "expected": "pause_music",
+      "laya": "pause_music",
+      "gated": "pause_music",
+      "confidence": 0.9602,
+      "act_probability": 1.0,
+      "latency_ms": 6567.5
+    },
+    {
+      "id": "pause-2",
+      "text": "stop the song please",
+      "expected": "pause_music",
+      "laya": "pause_music",
+      "gated": "pause_music",
+      "confidence": 0.9391,
+      "act_probability": 1.0,
+      "latency_ms": 5069.2
+    },
+    {
+      "id": "resume-1",
+      "text": "carry on with the music",
+      "expected": "resume_music",
+      "laya": "resume_music",
+      "gated": "fallback",
+      "confidence": 0.839,
+      "act_probability": 1.0,
+      "latency_ms": 12124.7
+    },
+    {
+      "id": "resume-2",
+      "text": "play the music again",
+      "expected": "resume_music",
+      "laya": "pause_music",
+      "gated": "fallback",
+      "confidence": 0.2096,
+      "act_probability": 1.0,
+      "latency_ms": 10012.0
+    },
+    {
+      "id": "next-1",
+      "text": "I don't like this song, skip it",
+      "expected": "next_track",
+      "laya": "next_track",
+      "gated": "fallback",
+      "confidence": 0.5861,
+      "act_probability": 1.0,
+      "latency_ms": 5286.9
+    },
+    {
+      "id": "next-2",
+      "text": "go to the following track",
+      "expected": "next_track",
+      "laya": "next_track",
+      "gated": "next_track",
+      "confidence": 0.9366,
+      "act_probability": 1.0,
+      "latency_ms": 5125.1
+    },
+    {
+      "id": "louder-1",
+      "text": "can you turn this up a bit",
+      "expected": "volume_up",
+      "laya": "volume_up",
+      "gated": "fallback",
+      "confidence": 0.4458,
+      "act_probability": 1.0,
+      "latency_ms": 5925.0
+    },
+    {
+      "id": "louder-2",
+      "text": "music is too quiet",
+      "expected": "volume_up",
+      "laya": "pause_music",
+      "gated": "fallback",
+      "confidence": 0.2462,
+      "act_probability": 1.0,
+      "latency_ms": 5657.0
+    },
+    {
+      "id": "quieter-1",
+      "text": "bring the volume down a notch",
+      "expected": "volume_down",
+      "laya": "volume_down",
+      "gated": "volume_down",
+      "confidence": 0.9941,
+      "act_probability": 1.0,
+      "latency_ms": 13038.8
+    },
+    {
+      "id": "quieter-2",
+      "text": "that's too loud",
+      "expected": "volume_down",
+      "laya": "pause_music",
+      "gated": "fallback",
+      "confidence": 0.0807,
+      "act_probability": 1.0,
+      "latency_ms": 7797.8
+    },
+    {
+      "id": "calendar-1",
+      "text": "when is my next meeting",
+      "expected": "next_calendar_event",
+      "laya": "next_calendar_event",
+      "gated": "next_calendar_event",
+      "confidence": 0.9967,
+      "act_probability": 1.0,
+      "latency_ms": 5395.7
+    },
+    {
+      "id": "calendar-2",
+      "text": "what do I have coming up next on my calendar",
+      "expected": "next_calendar_event",
+      "laya": "next_calendar_event",
+      "gated": "next_calendar_event",
+      "confidence": 0.9987,
+      "act_probability": 1.0,
+      "latency_ms": 5606.4
+    },
+    {
+      "id": "weather-1",
+      "text": "do I need a jacket outside right now",
+      "expected": "current_weather",
+      "laya": "current_weather",
+      "gated": "fallback",
+      "confidence": 0.0799,
+      "act_probability": 1.0,
+      "latency_ms": 11622.7
+    },
+    {
+      "id": "weather-2",
+      "text": "what are conditions like outside",
+      "expected": "current_weather",
+      "laya": "current_weather",
+      "gated": "current_weather",
+      "confidence": 0.9951,
+      "act_probability": 1.0,
+      "latency_ms": 7102.0
+    },
+    {
+      "id": "chat-1",
+      "text": "why is the sky blue",
+      "expected": "conversation",
+      "laya": "pause_music",
+      "gated": "fallback",
+      "confidence": 0.0396,
+      "act_probability": 1.0,
+      "latency_ms": 4858.1
+    },
+    {
+      "id": "chat-2",
+      "text": "help me think through tomorrow's presentation",
+      "expected": "conversation",
+      "laya": "conversation",
+      "gated": "conversation",
+      "confidence": 0.1071,
+      "act_probability": 1.0,
+      "latency_ms": 5548.9
+    },
+    {
+      "id": "negation-1",
+      "text": "do not pause the music",
+      "expected": "fallback",
+      "laya": "pause_music",
+      "gated": "fallback",
+      "confidence": 0.9659,
+      "act_probability": 1.0,
+      "latency_ms": 11088.8
+    },
+    {
+      "id": "negation-2",
+      "text": "don't turn it down, it's fine",
+      "expected": "fallback",
+      "laya": "volume_down",
+      "gated": "fallback",
+      "confidence": 0.4509,
+      "act_probability": 1.0,
+      "latency_ms": 8004.6
+    },
+    {
+      "id": "quoted-1",
+      "text": "she told me to say skip the next track",
+      "expected": "fallback",
+      "laya": "next_track",
+      "gated": "fallback",
+      "confidence": 0.9971,
+      "act_probability": 1.0,
+      "latency_ms": 5052.0
+    },
+    {
+      "id": "quoted-2",
+      "text": "the phrase pause the music sounds bossy",
+      "expected": "fallback",
+      "laya": "pause_music",
+      "gated": "fallback",
+      "confidence": 0.9919,
+      "act_probability": 1.0,
+      "latency_ms": 5816.5
+    },
+    {
+      "id": "multi-1",
+      "text": "pause this and tell me the weather",
+      "expected": "fallback",
+      "laya": "current_weather",
+      "gated": "fallback",
+      "confidence": 0.7453,
+      "act_probability": 1.0,
+      "latency_ms": 5977.4
+    },
+    {
+      "id": "multi-2",
+      "text": "turn it down then skip this song",
+      "expected": "fallback",
+      "laya": "volume_down",
+      "gated": "fallback",
+      "confidence": 0.9473,
+      "act_probability": 1.0,
+      "latency_ms": 5826.7
+    },
+    {
+      "id": "ambiguous-1",
+      "text": "stop",
+      "expected": "fallback",
+      "laya": "pause_music",
+      "gated": "fallback",
+      "confidence": 0.8388,
+      "act_probability": 1.0,
+      "latency_ms": 6033.1
+    },
+    {
+      "id": "ambiguous-2",
+      "text": "what's next",
+      "expected": "fallback",
+      "laya": "next_calendar_event",
+      "gated": "fallback",
+      "confidence": 0.8028,
+      "act_probability": 1.0,
+      "latency_ms": 6142.5
+    },
+    {
+      "id": "context-1",
+      "text": "turn it down",
+      "expected": "volume_down",
+      "laya": "volume_down",
+      "gated": "fallback",
+      "confidence": 0.7105,
+      "act_probability": 1.0,
+      "latency_ms": 5677.0
+    },
+    {
+      "id": "context-2",
+      "text": "continue",
+      "expected": "fallback",
+      "laya": "resume_music",
+      "gated": "fallback",
+      "confidence": 0.5792,
+      "act_probability": 1.0,
+      "latency_ms": 5908.9
+    },
+    {
+      "id": "parameter-1",
+      "text": "set the volume to forty percent",
+      "expected": "fallback",
+      "laya": "volume_up",
+      "gated": "fallback",
+      "confidence": 0.8324,
+      "act_probability": 1.0,
+      "latency_ms": 5562.6
+    },
+    {
+      "id": "parameter-2",
+      "text": "what will the weather be in Chicago Friday",
+      "expected": "fallback",
+      "laya": "current_weather",
+      "gated": "fallback",
+      "confidence": 0.9929,
+      "act_probability": 1.0,
+      "latency_ms": 6085.1
+    },
+    {
+      "id": "unsupported-1",
+      "text": "play Kid A by Radiohead",
+      "expected": "fallback",
+      "laya": "next_track",
+      "gated": "fallback",
+      "confidence": 0.2142,
+      "act_probability": 1.0,
+      "latency_ms": 6823.1
+    },
+    {
+      "id": "unsupported-2",
+      "text": "move my meeting to three",
+      "expected": "fallback",
+      "laya": "next_calendar_event",
+      "gated": "fallback",
+      "confidence": 0.6966,
+      "act_probability": 1.0,
+      "latency_ms": 6335.3
+    },
+    {
+      "id": "hypothetical-1",
+      "text": "what would happen if I paused the music",
+      "expected": "fallback",
+      "laya": "pause_music",
+      "gated": "fallback",
+      "confidence": 0.989,
+      "act_probability": 1.0,
+      "latency_ms": 6124.9
+    },
+    {
+      "id": "polite-chat",
+      "text": "thanks, that's all I needed",
+      "expected": "conversation",
+      "laya": "resume_music",
+      "gated": "fallback",
+      "confidence": 0.0802,
+      "act_probability": 1.0,
+      "latency_ms": 6035.9
+    }
+  ]
+}

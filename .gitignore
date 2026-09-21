@@ -12,3 +12,7 @@ node_modules/
 # Editor/OS noise.
 .DS_Store
 *.swp
+
+# Python bytecode from benchmark tooling.
+__pycache__/
+*.pyc

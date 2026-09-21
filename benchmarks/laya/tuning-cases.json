@@ -1,0 +1,14 @@
+[
+  {"text":"pause the music","expected":"pause_music"},
+  {"text":"keep the music going","expected":"resume_music"},
+  {"text":"skip this track","expected":"next_track"},
+  {"text":"make it a little louder","expected":"volume_up"},
+  {"text":"turn the volume down","expected":"volume_down"},
+  {"text":"read my next calendar event","expected":"next_calendar_event"},
+  {"text":"what is the weather right now","expected":"current_weather"},
+  {"text":"tell me something interesting","expected":"conversation"},
+  {"text":"don't pause the music","expected":"fallback"},
+  {"text":"I said quote next track end quote","expected":"fallback"},
+  {"text":"pause the music and tell me the weather","expected":"fallback"},
+  {"text":"stop","expected":"fallback"}
+]
