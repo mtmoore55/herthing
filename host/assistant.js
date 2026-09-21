@@ -49,7 +49,8 @@ function musePrompt(text, context) {
   const visible = {
     weather: context.weather,
     next_event: context.next_event,
-    now_playing: context.now_playing
+    now_playing: context.now_playing,
+    todos: context.todos
   }
   return [
     'You are the assistant behind HerThing, an ambient voice appliance.',
@@ -63,7 +64,8 @@ export function museBrowserPrompt(text, context) {
   const visible = {
     weather: context.weather,
     next_event: context.next_event,
-    now_playing: context.now_playing
+    now_playing: context.now_playing,
+    todos: context.todos
   }
   return [
     'This is a spoken request from Matthew, relayed by his HerThing voice device.',

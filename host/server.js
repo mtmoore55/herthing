@@ -11,6 +11,7 @@ import { cancelSpeech, speak, speechConfig } from './speech.js'
 import { extractWakeCommand, isSleepIntent } from './conversation-intents.js'
 import { playDismissalEarcon } from './earcon.js'
 import { addEnrollmentSample, extractSpeakerEmbedding, verifySpeaker } from './speaker-verification.js'
+import { appendNote, matchNoteIntent, mentionsTasks, noteConfirmation, notesConfig, readOpenTodos } from './notes.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
@@ -278,6 +279,34 @@ async function askAssistantInOrder(text, context) {
   }
 }
 
+// Capture is answered from the vault, not the assistant. Routing it through
+// the relay would add a round trip to the one kind of turn whose whole value
+// is being immediate, and would fail whenever the relay or the network does.
+async function resolveVoiceResponse(spokenRequest, rawTranscript) {
+  if (configuredNotes) {
+    // Prefer the untouched transcript. Ambient wake extraction lowercases and
+    // strips punctuation, and a saved note should read the way it was spoken.
+    const note = matchNoteIntent(rawTranscript) || matchNoteIntent(spokenRequest)
+    if (note) {
+      const startedAt = Date.now()
+      try {
+        const written = await appendNote(configuredNotes, note)
+        console.log(`[notes] ${note.target}: ${written.line}`)
+        return { provider: 'notes', text: noteConfirmation(note), elapsed_ms: Date.now() - startedAt }
+      } catch (error) {
+        console.error('[notes] capture failed:', error.message || error)
+        return { provider: 'notes', text: "I couldn't save that to your notes.", elapsed_ms: Date.now() - startedAt }
+      }
+    }
+  }
+  // The list is offered only when the request concerns it, so unrelated turns
+  // do not send personal notes to the assistant.
+  const context = configuredNotes && mentionsTasks(spokenRequest)
+    ? { ...state, todos: await readOpenTodos(configuredNotes).catch(() => []) }
+    : state
+  return askAssistantInOrder(spokenRequest, context)
+}
+
 function enqueueVoiceTurn(task) {
   pendingVoiceTurns += 1
   const trackedTask = async () => {
@@ -344,7 +373,7 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent }) {
       endConversation({ earcon: true })
     } else if (spokenRequest) {
       extendConversation()
-      const assistant = await askAssistantInOrder(spokenRequest, state)
+      const assistant = await resolveVoiceResponse(spokenRequest, transcription.text)
       if (conversationActive) {
         console.log(`[assistant:${assistant.provider}] ${assistant.elapsed_ms} ms: ${assistant.text}`)
         if (activeMicrophoneStream && activeCaptureHasSpeech) {
@@ -427,6 +456,7 @@ async function controlMicrophone(action) {
 
 const configuredWeather = weatherConfig()
 const configuredCalendar = calendarConfig()
+const configuredNotes = notesConfig()
 async function refreshWeather() {
   if (!configuredWeather) return
   try {

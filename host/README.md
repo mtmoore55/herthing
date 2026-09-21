@@ -48,6 +48,34 @@ The feed is fetched at startup and every five minutes. Recurring events are
 expanded locally. Feed contents and URLs are never stored by HerThing or sent
 to the Car Thing; the device receives only the normalized next event.
 
+## Notes
+
+Voice capture writes Markdown into a local vault — an Obsidian vault works
+unmodified, because the files are only ever plain Markdown. Point HerThing at
+the directory in the private environment file:
+
+```ini
+HERTHING_NOTES_DIR=/home/you/notes
+```
+
+Capture is disabled until that variable is set; no directory is created
+implicitly. Once set, `todos.md` and `inbox.md` are created on first use.
+
+Phrases such as "remind me to…", "add … to my to-do list", "take a note…",
+"note that…", and "write this down…" are matched by conservative literal rules
+in `notes.js` and answered locally, without a relay round trip. Everything else
+falls through to the assistant unchanged. Captured text is the transcript
+itself rather than anything a model extracted, so the only failure mode is a
+mishearing, and the result is an editable line in a file.
+
+Each captured line carries an Obsidian block anchor (`^2026-09-21T09-12-33-482`)
+so a later agent can refer to one specific item. Writes always append, which is
+what keeps a vault synced across devices from producing conflicts.
+
+The open to-do list is included in assistant context only when the request
+mentions tasks or reminders, so ordinary turns never send personal notes
+outward.
+
 Touchscreen media controls and playback state use the authenticated Spotify Web
 API token created by `spotify_player authenticate`. HerThing follows the active
 player on the account, so playback on a phone or another Spotify Connect target
