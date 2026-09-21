@@ -106,8 +106,14 @@ present.
 - Tap the previous, play/pause, and next buttons beside the active track. The
   controls remain available while music is paused.
 - Tap the calendar summary (or press preset 3) to open today's remaining
-  agenda, then swipe vertically to scroll. Tap the close button, press Back, or
-  press preset 1 to return home.
+  agenda, then swipe vertically to scroll. Press preset 1 to return home.
+- Press preset 4 to open Experiences. Signal, Terminal, Orbit, and Aurora each
+  change typography, control geometry, color, ambient field, and voice motion.
+  The choice is saved on the device.
+- On Spotify, Calendar, and Settings, turn the knob to move the visible focus
+  and press it to activate the focused control. Back returns home.
+- Hold the knob for microphone privacy from any view. Settings also provides a
+  prominent microphone toggle with persistent state.
 - The physical knob continues to control volume, and its press remains reserved
   for conversation.
 

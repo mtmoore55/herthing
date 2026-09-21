@@ -2,31 +2,66 @@
 <html lang="en"><head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0a0a09" /><title>HerThing</title>
-  <link rel="stylesheet" href="styles.css?v=conversation-legibility-1" />
+  <link rel="stylesheet" href="styles.css?v=event-legibility-1" />
 </head><body>
   <main class="world" id="world" data-view="home" data-music="false">
     <canvas id="visual-field" width="160" height="96" aria-hidden="true"></canvas><div class="veil"></div><div class="grain"></div>
     <header class="topline">
       <div class="clock-wrap"><time id="clock">6:02 PM</time><span id="date">FRI · SEP 18</span></div>
-      <div class="weather" id="weather"><span class="weather-symbol" id="weather-symbol">—</span><strong id="temperature">--°</strong><small id="condition">Weather unavailable</small></div>
+      <div class="weather" id="weather"><span class="weather-symbol" id="weather-symbol">—</span><strong id="temperature">--°</strong></div>
+      <span class="top-spacer"></span>
+      <div class="mic off" id="mic-status"><i><b></b></i><span id="mic-label">MIC OFF</span></div>
     </header>
     <section class="next" data-panel="calendar"><p class="eyebrow" id="event-kicker">NEXT</p>
       <div class="empty-state" id="event-empty">Calendar unavailable</div>
       <div class="event-state hidden" id="event-state"><h1 id="event-title"></h1><p><span id="event-time"></span><strong id="event-relative"></strong><span id="event-location"></span></p></div>
     </section>
     <section class="music" data-panel="spotify">
-      <img class="album-art" id="album-art" alt="" crossorigin="anonymous" />
-      <div class="track-copy"><p class="eyebrow">NOW PLAYING</p><div class="empty-state" id="track-empty">Nothing playing</div>
-        <div class="track-state hidden" id="track-state"><h2 id="track-title"></h2><p id="track-artist"></p><div class="progress"><i id="track-progress"></i></div></div>
+      <img class="album-art" id="album-art" alt="Album artwork" />
+      <div class="track-copy"><div class="empty-state" id="track-empty">Nothing playing</div>
+        <div class="track-state hidden" id="track-state"><h2 class="marquee-window"><span id="track-title"></span></h2><p class="marquee-window"><span id="track-artist"></span></p><div class="progress"><i id="track-progress"></i></div></div>
       </div>
-      <div class="transport" id="transport"><button data-command="spotify.previous" aria-label="Previous track">│‹</button><button data-command="spotify.toggle" id="play-button" aria-label="Play or pause">▶</button><button data-command="spotify.next" aria-label="Next track">›│</button><time id="track-time">0:00</time></div>
+      <div class="transport" id="transport"><button data-command="spotify.previous" aria-label="Previous track"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h2v14H5zM18 5v14L8 12z"/></svg></button><button data-command="spotify.toggle" id="play-button" aria-label="Play or pause"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14l12-7z"/></svg></button><button data-command="spotify.next" aria-label="Next track"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5h2v14h-2zM6 5v14l10-7z"/></svg></button><time id="track-time">0:00</time></div>
     </section>
-    <section class="agenda" id="agenda" aria-label="Today's calendar"><header><div><p class="eyebrow">TODAY</p><h2>Upcoming</h2></div><button data-view-command="home" aria-label="Close agenda">×</button></header><div class="agenda-list" id="agenda-list"></div></section>
+    <section class="agenda" id="agenda" aria-label="Today's calendar"><header><div><h2>Today</h2></div><span class="view-exit">01 · HOME</span></header><div class="agenda-list" id="agenda-list"></div></section>
+    <section class="spotify-panel" id="spotify-panel" aria-label="Spotify controls">
+      <header><div><h2>Now playing</h2></div><span class="view-exit">01 · HOME</span></header>
+      <div class="spotify-panel-body">
+        <img id="spotify-panel-art" alt="Album artwork" />
+        <div class="spotify-panel-track">
+          <h3 class="marquee-window"><span id="spotify-panel-title">Nothing playing</span></h3><p class="marquee-window"><span id="spotify-panel-artist"></span></p><small id="spotify-panel-album"></small>
+          <div class="spotify-panel-progress"><i id="spotify-panel-progress"></i></div>
+          <div class="spotify-panel-times"><span id="spotify-panel-position">0:00</span><span id="spotify-panel-duration">0:00</span></div>
+          <div class="spotify-panel-transport">
+            <button data-command="spotify.previous" data-feedback="PREVIOUS TRACK" aria-label="Previous track"><svg viewBox="0 0 24 24"><path d="M5 5h2v14H5zM18 5v14L8 12z"/></svg></button>
+            <button data-command="spotify.toggle" id="spotify-panel-play" aria-label="Play or pause"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z"/></svg></button>
+            <button data-command="spotify.next" data-feedback="NEXT TRACK" aria-label="Next track"><svg viewBox="0 0 24 24"><path d="M17 5h2v14h-2zM6 5v14l10-7z"/></svg></button>
+          </div>
+        </div>
+        <div class="spotify-output">
+          <div class="output-heading"><p class="eyebrow">OUTPUT</p><span id="spotify-active-device">NO ACTIVE DEVICE</span></div>
+          <button class="transfer-primary" id="spotify-transfer" data-command="spotify.transfer"><i></i><span>PLAY ON HERTHING</span></button>
+          <div class="spotify-modes"><button id="spotify-shuffle" data-command="spotify.shuffle">SHUFFLE</button><button id="spotify-repeat" data-command="spotify.repeat">REPEAT</button></div>
+          <div class="spotify-devices" id="spotify-devices"></div>
+        </div>
+      </div>
+    </section>
+    <section class="settings-panel" id="settings-panel" aria-label="Settings">
+      <header><div><h2>Experiences</h2><p>Choose how HerThing looks, moves and responds.</p></div><span class="view-exit">01 · HOME</span></header>
+      <button class="microphone-toggle" id="microphone-toggle" data-command="microphone.toggle" data-feedback="MICROPHONE MUTED"><i><b></b></i><span><strong>Microphone</strong><small id="microphone-toggle-detail">Listening for “Ziggy” · hold knob to mute</small></span><em id="microphone-toggle-state">ON</em></button>
+      <div class="theme-grid">
+        <button class="theme-card signal" data-theme-choice="signal"><i><b></b></i><strong>Signal</strong><span>Pixel field · wave transmission</span></button>
+        <button class="theme-card terminal" data-theme-choice="terminal"><i><b></b></i><strong>Terminal</strong><span>Scan field · hard telemetry</span></button>
+        <button class="theme-card orbit" data-theme-choice="orbit"><i><b></b></i><strong>Orbit</strong><span>Radial field · expanding rings</span></button>
+        <button class="theme-card aurora" data-theme-choice="aurora"><i><b></b></i><strong>Aurora</strong><span>Soft bands · flowing voice</span></button>
+      </div>
+      <div class="settings-note"><strong>KNOB</strong><span>Turn to choose · press to select · hold anywhere for microphone privacy.</span></div>
+    </section>
     <aside class="turn-state" id="turn-state"><strong id="turn-label">LISTENING</strong><span id="turn-hint">PRESS KNOB WHEN DONE</span></aside>
     <aside class="response" id="assistant-response"></aside>
-    <footer><div class="mic off" id="mic-status"><i><b></b></i><span id="mic-label">MIC OFF</span></div><div class="connection offline" id="connection"><i></i><span>HOST OFFLINE</span></div></footer>
-    <aside class="toast" id="toast" aria-live="polite"></aside>
-    <aside class="volume" id="volume" aria-hidden="true"><span>VOLUME</span><div><i id="volume-level"></i></div><strong id="volume-value">50</strong></aside>
+    <footer><div class="connection offline" id="connection"><i></i><span>HOST OFFLINE</span></div></footer>
+    <aside class="toast feedback" id="toast" aria-live="polite"></aside>
+    <aside class="volume feedback" id="volume" aria-hidden="true"><span>VOLUME</span><strong id="volume-value">50</strong><div><i id="volume-level"></i></div></aside>
   </main>
-  <script src="visuals.js?v=environmental-clock-webgl-1"></script><script src="app.js?v=environmental-clock-webgl-1"></script>
+  <script src="visuals.js?v=contrast-floor-2"></script><script src="app.js?v=event-legibility-2"></script>
 </body></html>

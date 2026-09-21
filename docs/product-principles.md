@@ -100,13 +100,14 @@ Car Thing's controls are an advantage. The initial mapping is:
 
 | Control | Default behavior |
 |---|---|
-| Knob turn | Volume / selection |
-| Knob press | Start or end conversation / confirm |
+| Knob turn | Home volume / secondary-screen selection |
+| Knob press | Home conversation / secondary-screen confirm |
+| Knob hold | Microphone mute / unmute |
 | Preset 1 | Home |
 | Preset 2 | Music |
 | Preset 3 | Today |
-| Preset 4 | Microphone state |
-| Back | Back / cancel / dismiss |
+| Preset 4 | Experiences / settings |
+| Back | Back / return home |
 
 Mappings may evolve; common actions should develop physical muscle memory.
 

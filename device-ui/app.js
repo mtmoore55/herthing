@@ -8,24 +8,44 @@
   var toastTimer = null
   var volumeTimer = null
   var responseTimer = null
+  var responseAdvanceTimer = null
   var lastResponse = null
+  var responseLines = []
+  var responseLine = 0
+  var responseManual = false
   var volume = 50
   var hostClockSkewMs = 0
   var eventUrgency = 0
   var visualHourOverride = null
   var visualClockOverride = null
+  var activeTheme = 'signal'
+  var knobHoldTimer = null
+  var knobHeld = false
   var state = {
     clock: { utc_offset_minutes: 0 },
     weather: null,
     next_event: null,
     today_events: [],
     now_playing: null,
+    spotify_devices: [],
     microphone: { mode: 'off', activity: 'idle' }
   }
 
   var $ = function (id) { return document.getElementById(id) }
   var dashboard = document.querySelector('.world')
   var connection = $('connection')
+
+  function applyTheme(name, announce) {
+    if (['signal', 'terminal', 'orbit', 'aurora'].indexOf(name) < 0) name = 'signal'
+    activeTheme = name
+    dashboard.dataset.theme = name
+    try { localStorage.setItem('herthing-theme', name) } catch (_) {}
+    Array.prototype.forEach.call(document.querySelectorAll('[data-theme-choice]'), function (button) {
+      button.classList.toggle('selected', button.dataset.themeChoice === name)
+    })
+    if (window.HerThingVisuals && window.HerThingVisuals.setTheme) window.HerThingVisuals.setTheme(name)
+    if (announce) showToast(name.toUpperCase())
+  }
 
   function messageId() {
     return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
@@ -104,9 +124,9 @@
     var now = new Date(Date.now() + hostClockSkewMs)
     $('clock').textContent = formatTime(now)
     var wallClock = wallClockDate(now)
-    var weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-    var months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-    $('date').textContent = weekdays[wallClock.getUTCDay()] + ' · ' + months[wallClock.getUTCMonth()] + ' ' + wallClock.getUTCDate()
+    var weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    $('date').textContent = weekdays[wallClock.getUTCDay()] + ' ' + months[wallClock.getUTCMonth()] + ' ' + wallClock.getUTCDate()
     var clockHours = wallClock.getUTCHours() % 12 || 12
     var gridClock = visualClockOverride || clockHours + ':' + String(wallClock.getUTCMinutes()).padStart(2, '0')
     if (window.HerThingVisuals) window.HerThingVisuals.setClock(gridClock)
@@ -127,7 +147,7 @@
     dashboard.style.setProperty('--event-opacity', conversation ? .2 : (.34 + eventUrgency * .66))
     dashboard.style.setProperty('--event-size', (22 + eventUrgency * 27).toFixed(1) + 'px')
     dashboard.style.setProperty('--event-shift', (eventUrgency * 18).toFixed(1) + 'px')
-    dashboard.style.setProperty('--event-detail-opacity', Math.max(.08, 1 - eventUrgency * 1.16).toFixed(2))
+    dashboard.style.setProperty('--event-detail-opacity', (conversation ? .62 : Math.max(.88, 1 - eventUrgency * .12)).toFixed(2))
     dashboard.style.setProperty('--event-kicker-size', (10 + eventUrgency * 5).toFixed(1) + 'px')
     dashboard.style.setProperty('--music-opacity', conversation ? .2 : Math.max(.3, 1 - eventUrgency * .68))
     if (window.HerThingVisuals) window.HerThingVisuals.setUrgency(eventUrgency)
@@ -140,9 +160,11 @@
     $('event-kicker').textContent = minutes > 0 && minutes <= 60
       ? 'IN ' + minutes + ' MIN'
       : minutes <= 0 && minutes > -60 ? 'HAPPENING NOW' : 'NEXT'
-    $('event-relative').textContent = minutes > 0
-      ? 'in ' + (minutes < 60 ? minutes + ' min' : Math.floor(minutes / 60) + 'h ' + (minutes % 60) + 'm')
-      : minutes > -60 ? 'started ' + Math.abs(minutes) + ' min ago' : ''
+    var relative = $('event-relative')
+    relative.classList.toggle('hidden', minutes <= 60)
+    relative.textContent = minutes > 60
+      ? 'in ' + Math.floor(minutes / 60) + 'h ' + (minutes % 60) + 'm'
+      : ''
   }
 
   function weatherIcon(value) {
@@ -162,11 +184,11 @@
     var weather = state.weather
     $('weather-symbol').innerHTML = weather ? weatherIcon(weather.symbol || weather.condition) : ''
     $('temperature').textContent = weather ? Math.round(weather.temperature) + '°' : '--°'
-    $('condition').textContent = weather ? weather.condition : 'Weather unavailable'
   }
 
   function renderEvent() {
     var event = state.next_event
+    dashboard.dataset.event = String(!!event)
     $('event-empty').classList.toggle('hidden', !!event)
     $('event-state').classList.toggle('hidden', !event)
     if (!event) return
@@ -183,7 +205,7 @@
     list.innerHTML = events.map(function (event) {
       var time = event.all_day ? 'ALL DAY' : formatTime(new Date(event.starts_at))
       var location = event.location ? '<span>' + escapeHtml(event.location) + '</span>' : ''
-      return '<article class="agenda-item"><time class="agenda-time">' + time + '</time><div class="agenda-copy"><strong>' + escapeHtml(event.title) + '</strong>' + location + '</div></article>'
+      return '<article class="agenda-item" tabindex="-1"><time class="agenda-time">' + time + '</time><i aria-hidden="true"></i><div class="agenda-copy"><strong>' + escapeHtml(event.title) + '</strong>' + location + '</div></article>'
     }).join('')
   }
 
@@ -198,6 +220,34 @@
     return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0')
   }
 
+  function playbackIcon(playing) {
+    return playing
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7Zm6 0h4v14h-4Z"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14l12-7z"/></svg>'
+  }
+
+  function setMarqueeText(id, value) {
+    var element = $(id)
+    var text = String(value || '')
+    if (element.textContent === text && element.dataset.marqueeReady === 'true') return
+    element.textContent = text
+    element.dataset.marqueeReady = 'false'
+    element.classList.remove('marquee-active')
+    element.parentElement.classList.remove('is-marquee')
+    setTimeout(function () {
+      var windowWidth = element.parentElement.clientWidth
+      var overflow = element.scrollWidth - windowWidth
+      if (overflow > 2) {
+        var shift = overflow + 24
+        element.style.setProperty('--marquee-shift', '-' + shift + 'px')
+        element.style.setProperty('--marquee-duration', Math.max(10, Math.min(19, 9 + shift / 24)).toFixed(1) + 's')
+        element.parentElement.classList.add('is-marquee')
+        element.classList.add('marquee-active')
+      }
+      element.dataset.marqueeReady = 'true'
+    }, 80)
+  }
+
   function renderTrack() {
     var track = state.now_playing
     dashboard.dataset.track = String(!!track)
@@ -206,16 +256,53 @@
     $('track-state').classList.toggle('hidden', !track)
     if (!track) {
       $('album-art').removeAttribute('src')
+      $('spotify-panel-art').removeAttribute('src')
+      $('spotify-panel-title').textContent = 'Nothing playing'
+      $('spotify-panel-artist').textContent = 'Start something in Spotify first'
+      Array.prototype.forEach.call(document.querySelectorAll('[data-command="spotify.previous"],[data-command="spotify.toggle"],[data-command="spotify.next"]'), function (button) { button.disabled = true })
       if (window.HerThingVisuals) window.HerThingVisuals.setArtwork(null)
       return
     }
-    $('track-title').textContent = track.track
-    $('track-artist').textContent = track.artist
+    Array.prototype.forEach.call(document.querySelectorAll('[data-command="spotify.previous"],[data-command="spotify.toggle"],[data-command="spotify.next"]'), function (button) { button.disabled = false })
+    setMarqueeText('track-title', track.track)
+    setMarqueeText('track-artist', track.artist)
     $('track-time').textContent = formatDuration(track.position_ms)
-    $('play-button').textContent = track.playing ? 'Ⅱ' : '▶'
+    $('play-button').innerHTML = playbackIcon(track.playing)
     $('track-progress').style.width = (track.duration_ms ? Math.min(100, track.position_ms / track.duration_ms * 100) : 0) + '%'
-    if (track.art_url && $('album-art').src !== track.art_url) $('album-art').src = track.art_url
+    if (track.art_url && $('album-art').getAttribute('src') !== track.art_url) $('album-art').setAttribute('src', track.art_url)
+    renderSpotifyPanel(track)
     if (window.HerThingVisuals) window.HerThingVisuals.setArtwork(track.art_url || track.track, track.playing)
+  }
+
+  function renderSpotifyPanel(track) {
+    setMarqueeText('spotify-panel-title', track.track)
+    setMarqueeText('spotify-panel-artist', track.artist)
+    $('spotify-panel-album').textContent = track.album || ''
+    $('spotify-panel-position').textContent = formatDuration(track.position_ms)
+    $('spotify-panel-duration').textContent = formatDuration(track.duration_ms)
+    $('spotify-panel-progress').style.width = (track.duration_ms ? Math.min(100, track.position_ms / track.duration_ms * 100) : 0) + '%'
+    $('spotify-panel-play').innerHTML = playbackIcon(track.playing)
+    if (track.art_url && $('spotify-panel-art').getAttribute('src') !== track.art_url) $('spotify-panel-art').setAttribute('src', track.art_url)
+
+    var devices = state.spotify_devices || []
+    var herthing = devices.find(function (device) { return /herthing|shed/i.test(device.name) })
+    var transfer = $('spotify-transfer')
+    transfer.dataset.deviceId = herthing ? herthing.id : ''
+    transfer.disabled = !herthing || herthing.restricted
+    transfer.classList.toggle('active', Boolean(herthing && herthing.active))
+    transfer.querySelector('span').textContent = herthing && herthing.active ? 'PLAYING ON HERTHING' : herthing ? 'PLAY ON HERTHING' : 'HERTHING OFFLINE'
+    var activeDevice = devices.find(function (device) { return device.active })
+    $('spotify-active-device').textContent = activeDevice ? activeDevice.name : 'NO ACTIVE DEVICE'
+
+    $('spotify-shuffle').classList.toggle('active', Boolean(track.shuffle))
+    $('spotify-shuffle').dataset.enabled = String(!track.shuffle)
+    var nextRepeat = track.repeat === 'off' ? 'context' : track.repeat === 'context' ? 'track' : 'off'
+    $('spotify-repeat').classList.toggle('active', track.repeat !== 'off')
+    $('spotify-repeat').dataset.mode = nextRepeat
+    $('spotify-repeat').textContent = track.repeat === 'track' ? 'REPEAT ONE' : track.repeat === 'context' ? 'REPEAT ALL' : 'REPEAT'
+    $('spotify-devices').innerHTML = devices.map(function (device) {
+      return '<button class="' + (device.active ? 'active' : '') + '" data-command="spotify.transfer" data-device-id="' + escapeHtml(device.id) + '" data-feedback="PLAYING ON ' + escapeHtml(device.name) + '"' + (device.restricted ? ' disabled' : '') + '>' + escapeHtml(device.name) + '<small>' + escapeHtml(device.type) + (device.volume == null ? '' : ' · ' + device.volume + '%') + '</small></button>'
+    }).join('')
   }
 
   function renderMicrophone() {
@@ -230,6 +317,13 @@
         : microphone.activity === 'speaking'
           ? 'HERTHING · SPEAKING'
           : microphone.activity === 'thinking' ? 'HERTHING · THINKING' : mode.toUpperCase()
+    var toggle = $('microphone-toggle')
+    if (toggle) {
+      toggle.classList.toggle('off', mode === 'off')
+      $('microphone-toggle-state').textContent = mode === 'off' ? 'OFF' : 'ON'
+      $('microphone-toggle-detail').textContent = mode === 'off' ? 'Wake listening is disabled · hold knob to restore' : 'Listening for “Ziggy” · hold knob to mute'
+      toggle.dataset.feedback = mode === 'off' ? 'MICROPHONE ON' : 'MICROPHONE MUTED'
+    }
     $('turn-label').textContent = microphone.activity === 'thinking' ? 'Thinking' : 'Listening'
     $('turn-hint').textContent = microphone.activity === 'thinking'
       ? 'ONE MOMENT · PRESS TO END CONVERSATION'
@@ -247,37 +341,144 @@
     var key = response ? 'assistant:' + response : transcript ? 'user:' + transcript : ''
     if (!value || key === lastResponse) return
     lastResponse = key
-    element.textContent = response ? value : '“' + value + '”'
+    clearTimeout(responseAdvanceTimer)
+    responseManual = false
+    responseLine = 0
+    responseLines = response ? wrapResponseLines(value) : ['“' + value + '”']
+    element.innerHTML = '<div class="response-track">' + responseLines.map(function (line, index) {
+      return '<div class="response-line" data-line="' + index + '">' + escapeHtml(line) + '</div>'
+    }).join('') + '</div><div class="response-position" aria-hidden="true"></div>'
     element.classList.add('visible')
+    positionResponseLine(0)
+    if (response && responseLines.length > 1) scheduleResponseLine()
     clearTimeout(responseTimer)
     // Assistant language should remain long enough to read comfortably, even
     // after a short spoken response finishes. User transcripts are briefer.
     var words = String(value).trim().split(/\s+/).filter(Boolean).length
     var visibleMs = response
-      ? Math.max(12000, Math.min(30000, 4000 + words * 360))
+      ? Math.max(15000, Math.min(45000, 5500 + words * 430))
       : Math.max(5500, Math.min(12000, 2500 + words * 300))
-    responseTimer = setTimeout(function () { element.classList.remove('visible') }, visibleMs)
+    responseTimer = setTimeout(function () {
+      element.classList.remove('visible')
+      clearTimeout(responseAdvanceTimer)
+    }, visibleMs)
+  }
+
+  function wrapResponseLines(text) {
+    var words = String(text).trim().split(/\s+/).filter(Boolean)
+    var lines = []
+    var line = ''
+    words.forEach(function (word) {
+      var candidate = line ? line + ' ' + word : word
+      if (candidate.length > 31 && line) { lines.push(line); line = word } else line = candidate
+    })
+    if (line) lines.push(line)
+    return lines.length ? lines : ['']
+  }
+
+  function positionResponseLine(index) {
+    var element = $('assistant-response')
+    responseLine = Math.max(0, Math.min(responseLines.length - 1, index))
+    element.style.setProperty('--response-line', String(responseLine))
+    Array.prototype.forEach.call(element.querySelectorAll('.response-line'), function (line, lineIndex) {
+      line.classList.toggle('current', lineIndex === responseLine)
+      line.classList.toggle('past', lineIndex < responseLine)
+    })
+    var position = element.querySelector('.response-position')
+    if (position) position.textContent = responseLines.length > 1 ? (responseLine + 1) + ' / ' + responseLines.length : ''
+  }
+
+  function scheduleResponseLine() {
+    clearTimeout(responseAdvanceTimer)
+    if (responseManual || responseLine >= responseLines.length - 1) return
+    var words = responseLines[responseLine].split(/\s+/).filter(Boolean).length
+    responseAdvanceTimer = setTimeout(function () {
+      positionResponseLine(responseLine + 1)
+      scheduleResponseLine()
+    }, Math.max(1500, 420 + words * 315))
+  }
+
+  function scrollResponse(direction) {
+    if (!$('assistant-response').classList.contains('visible') || responseLines.length < 2) return false
+    responseManual = true
+    clearTimeout(responseAdvanceTimer)
+    positionResponseLine(responseLine + direction)
+    return true
   }
 
   function render() { renderWeather(); renderEvent(); renderAgenda(); renderTrack(); renderMicrophone(); renderResponse(); renderAttention(new Date(Date.now() + hostClockSkewMs)) }
 
   function showToast(text) {
+    $('volume').classList.remove('visible')
+    clearTimeout(volumeTimer)
     $('toast').textContent = text
     $('toast').classList.add('visible')
     clearTimeout(toastTimer)
-    toastTimer = setTimeout(function () { $('toast').classList.remove('visible') }, 1800)
+    toastTimer = setTimeout(function () { $('toast').classList.remove('visible') }, 1450)
   }
 
   function showVolume(delta) {
+    $('toast').classList.remove('visible')
+    clearTimeout(toastTimer)
     volume = Math.max(0, Math.min(100, volume + delta))
     $('volume-value').textContent = String(volume)
     $('volume-level').style.width = volume + '%'
     $('volume').classList.add('visible')
     clearTimeout(volumeTimer)
-    volumeTimer = setTimeout(function () { $('volume').classList.remove('visible') }, 1200)
+    volumeTimer = setTimeout(function () { $('volume').classList.remove('visible') }, 1350)
   }
 
-  function setView(view) { dashboard.dataset.view = view; showToast(view === 'home' ? 'HOME' : view.toUpperCase()) }
+  function setView(view) {
+    clearKnobFocus()
+    dashboard.dataset.view = view
+    var panel = view === 'spotify' ? $('spotify-panel') : view === 'calendar' ? $('agenda') : view === 'settings' ? $('settings-panel') : null
+    if (panel) { panel.scrollTop = 0; panel.scrollLeft = 0 }
+  }
+
+  function clearKnobFocus() {
+    var selected = document.querySelector('.knob-focus')
+    if (selected) selected.classList.remove('knob-focus')
+  }
+
+  function focusableItems() {
+    var view = dashboard.dataset.view
+    var panel = view === 'spotify' ? $('spotify-panel') : view === 'calendar' ? $('agenda') : view === 'settings' ? $('settings-panel') : null
+    if (!panel) return []
+    return Array.prototype.slice.call(panel.querySelectorAll('button:not(:disabled),.agenda-item'))
+  }
+
+  function moveKnobFocus(direction) {
+    var items = focusableItems()
+    if (!items.length) return false
+    var current = document.querySelector('.knob-focus')
+    var index = items.indexOf(current)
+    if (index < 0) index = direction > 0 ? -1 : 0
+    index = (index + direction + items.length) % items.length
+    clearKnobFocus()
+    items[index].classList.add('knob-focus')
+    var view = dashboard.dataset.view
+    var panel = view === 'spotify' ? $('spotify-panel') : view === 'calendar' ? $('agenda') : $('settings-panel')
+    var panelRect = panel.getBoundingClientRect()
+    var itemRect = items[index].getBoundingClientRect()
+    panel.scrollLeft = 0
+    panel.scrollTop = Math.max(0, panel.scrollTop + itemRect.top - panelRect.top - (panel.clientHeight - itemRect.height) / 2)
+    return true
+  }
+
+  function activateKnobFocus() {
+    var selected = document.querySelector('.knob-focus')
+    if (!selected) {
+      moveKnobFocus(1)
+      return
+    }
+    if (selected.tagName === 'BUTTON') selected.dispatchEvent(new Event('pointerdown', { bubbles:true, cancelable:true }))
+  }
+
+  function toggleMicrophone() {
+    var muted = state.microphone && state.microphone.mode === 'off'
+    sendCommand('microphone.toggle')
+    showToast(muted ? 'MICROPHONE ON' : 'MICROPHONE MUTED')
+  }
 
   window.addEventListener('wheel', function (event) {
     event.preventDefault()
@@ -285,25 +486,71 @@
     // Car Thing reports the physical rotary direction opposite to desktop
     // wheel convention.
     var direction = delta > 0 ? -1 : 1
+    if (dashboard.dataset.view !== 'home') { moveKnobFocus(direction); return }
+    if (scrollResponse(direction)) return
     showVolume(direction * 4)
     sendInput(direction > 0 ? 'knob_right' : 'knob_left', { volume: volume })
   }, { passive: false, capture: true })
 
   window.addEventListener('keydown', function (event) {
     var code = event.code || event.key
-    var inputMap = { Enter: 'knob_press', Escape: 'back', Digit1: 'preset_1', Digit2: 'preset_2', Digit3: 'preset_3', Digit4: 'preset_4' }
-    if (!inputMap[code]) return
+    var inputMap = { Escape: 'back', Digit1: 'preset_1', Digit2: 'preset_2', Digit3: 'preset_3', Digit4: 'preset_4' }
+    if (code === 'Enter') {
+      event.preventDefault()
+      if (event.repeat || knobHoldTimer) return
+      knobHeld = false
+      knobHoldTimer = setTimeout(function () { knobHeld = true; knobHoldTimer = null; toggleMicrophone() }, 700)
+      return
+    }
+    if (!inputMap[code] || event.repeat) return
     event.preventDefault()
     sendInput(inputMap[code])
-    if (code === 'Digit1' || code === 'Escape') setView('home')
+    if (code === 'Digit1') setView('home')
     if (code === 'Digit2') setView('spotify')
     if (code === 'Digit3') setView('calendar')
-    if (code === 'Digit4') showToast('MIC OFF')
+    if (code === 'Digit4') setView('settings')
+    if (code === 'Escape' && dashboard.dataset.view !== 'home') setView('home')
+  }, true)
+
+  window.addEventListener('keyup', function (event) {
+    var code = event.code || event.key
+    if (code !== 'Enter') return
+    event.preventDefault()
+    if (knobHoldTimer) { clearTimeout(knobHoldTimer); knobHoldTimer = null }
+    if (knobHeld) { knobHeld = false; return }
+    if (dashboard.dataset.view !== 'home') activateKnobFocus()
+    else {
+      sendInput('knob_press')
+      showToast(state.conversation && state.conversation.active ? 'VOICE CLOSED' : 'LISTENING')
+    }
   }, true)
 
   window.addEventListener('pointerdown', function (event) {
+    var themeChoice = event.target.closest('[data-theme-choice]')
+    if (themeChoice) { event.preventDefault(); applyTheme(themeChoice.dataset.themeChoice, true); return }
     var command = event.target.closest('[data-command]')
-    if (command) { event.preventDefault(); sendCommand(command.dataset.command); showToast(command.getAttribute('aria-label') || 'MEDIA'); return }
+    if (command) {
+      event.preventDefault()
+      if (command.dataset.command === 'microphone.toggle') { toggleMicrophone(); return }
+      var args = {}
+      if (command.dataset.deviceId) args.device_id = command.dataset.deviceId
+      if (command.dataset.enabled) args.enabled = command.dataset.enabled === 'true'
+      if (command.dataset.mode) args.mode = command.dataset.mode
+      sendCommand(command.dataset.command, args)
+      var feedback = command.dataset.feedback || (command.dataset.command === 'spotify.previous'
+        ? 'PREVIOUS TRACK'
+        : command.dataset.command === 'spotify.next'
+          ? 'NEXT TRACK'
+          : command.dataset.command === 'spotify.shuffle'
+            ? args.enabled ? 'SHUFFLE ON' : 'SHUFFLE OFF'
+            : command.dataset.command === 'spotify.repeat'
+              ? args.mode === 'off' ? 'REPEAT OFF' : args.mode === 'track' ? 'REPEAT ONE' : 'REPEAT ALL'
+              : command.dataset.command === 'spotify.transfer'
+                ? 'SWITCHING OUTPUT'
+                : state.now_playing && state.now_playing.playing ? 'PAUSED' : 'PLAYING')
+      showToast(feedback)
+      return
+    }
     var viewCommand = event.target.closest('[data-view-command]')
     if (viewCommand) { event.preventDefault(); setView(viewCommand.dataset.viewCommand); return }
     var panel = event.target.closest('[data-panel]')
@@ -321,7 +568,8 @@
     state.today_events = [state.next_event, { title: 'Dinner with Andy', starts_at: new Date(Date.now() + (minutes + 120) * 60000).toISOString(), location: 'Downtown' }]
     state.microphone = { mode: mode === 'off' ? 'off' : 'ambient', activity: 'idle' }
     if (mode.indexOf('music') >= 0 || mode === 'track') {
-      state.now_playing = { track: 'Everything in Its Right Place', artist: 'Radiohead', album: 'Kid A', art_url: null, duration_ms: 251000, position_ms: 137000, playing: true }
+      state.now_playing = { track: 'Everything in Its Right Place', artist: 'Radiohead', album: 'Kid A', art_url: null, duration_ms: 251000, position_ms: 137000, playing: true, device:'iPhone', shuffle:false, repeat:'off' }
+      state.spotify_devices = [{ id:'shed', name:'HerThing Shed', type:'Computer', active:false, restricted:false }, { id:'phone', name:'iPhone', type:'Smartphone', active:true, restricted:false }]
     }
     if (mode.indexOf('user') >= 0) state.microphone = { mode: 'conversation', activity: 'listening', user_energy: .72 }
     if (mode.indexOf('transcription') >= 0) { state.microphone = { mode: 'conversation', activity: 'thinking' }; state.transcript = 'what does tomorrow morning look like' }
@@ -419,7 +667,12 @@
   if (demoMode) enableDemo(demoMode, parameters.get('minutes'))
   if (debugMode) enableDemo('ambient', 180)
   if (parameters.get('view')) dashboard.dataset.view = parameters.get('view')
+  var storedTheme = 'signal'
+  try { storedTheme = localStorage.getItem('herthing-theme') || 'signal' } catch (_) {}
+  applyTheme(parameters.get('theme') || storedTheme, false)
   tick(); render(); setInterval(tick, 1000)
+  if (parameters.get('feedback') === 'volume') setTimeout(function () { showVolume(0) }, 100)
+  if (parameters.get('feedback') === 'media') setTimeout(function () { showToast('NEXT TRACK') }, 100)
   if (debugMode) buildDebugLab()
   if (!demoMode && !debugMode) connect()
 })()
