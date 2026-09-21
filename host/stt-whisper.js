@@ -2,9 +2,12 @@ import { resolve } from 'node:path'
 import { unlink } from 'node:fs/promises'
 
 const defaultBinary = resolve(import.meta.dir, '../.artifacts/src/whisper.cpp/build/bin/whisper-cli')
-const defaultModel = resolve(import.meta.dir, '../.artifacts/src/whisper.cpp/models/ggml-tiny.en.bin')
+const defaultModel = resolve(import.meta.dir, '../.artifacts/src/whisper.cpp/models/ggml-base.en.bin')
 const defaultServerUrl = 'http://127.0.0.1:8792/inference'
-const domainPrompt = 'HerThing is a voice assistant. Requests may mention Spotify, calendars, weather, meetings, reminders, and music.'
+// Whisper uses this as decoding context, not as text to prepend. Keep it short
+// and concrete so product names common in real HerThing conversations retain
+// their spelling instead of being replaced by phonetically similar words.
+const domainPrompt = 'HerThing voice assistant. Ziggy, Muse, Spotify, Meta, Apple Notes, Obsidian, Google Keep, Google Tasks, calendar, weather, meetings, reminders, music.'
 
 export function normalizeTranscript(value) {
   const text = String(value || '')

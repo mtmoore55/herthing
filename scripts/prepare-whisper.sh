@@ -4,7 +4,7 @@ set -euo pipefail
 project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 source_dir="$project_root/.artifacts/src/whisper.cpp"
 commit=5670d5c0bbcb148feabef84400a07cfca9aa3b30
-model_sha=c78c86eb1a8faa21b369bcd33207cc90d64ae9df
+model_sha=137c40403d78fd54d454da0f9bd998f78703390c
 
 if [[ ! -d "$source_dir/.git" ]]; then
   git clone https://github.com/ggml-org/whisper.cpp.git "$source_dir"
@@ -12,9 +12,9 @@ fi
 git -C "$source_dir" fetch origin "$commit"
 git -C "$source_dir" checkout --detach "$commit"
 
-model="$source_dir/models/ggml-tiny.en.bin"
+model="$source_dir/models/ggml-base.en.bin"
 if [[ ! -f "$model" ]]; then
-  "$source_dir/models/download-ggml-model.sh" tiny.en
+  "$source_dir/models/download-ggml-model.sh" base.en
 fi
 printf '%s  %s\n' "$model_sha" "$model" | sha1sum --check --strict
 

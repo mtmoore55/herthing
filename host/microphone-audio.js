@@ -37,11 +37,12 @@ export function createSpeechEndpointDetector({
   silenceDb = -65,
   startupDelayMs = 450,
   minimumSpeechMs = 300,
-  trailingSilenceMs = 650
+  trailingSilenceMs = 650,
+  initialSpeechMs = 0
 } = {}) {
-  let voicedMs = 0
+  let voicedMs = initialSpeechMs
   let quietMs = 0
-  let armed = false
+  let armed = voicedMs >= minimumSpeechMs
   let elapsedMs = 0
 
   return {
@@ -65,5 +66,34 @@ export function createSpeechEndpointDetector({
         endpoint: armed && quietMs >= trailingSilenceMs
       }
     }
+  }
+}
+
+export function createPcmRingBuffer(maxBytes = 16000 * 4 * 2, sampleBytes = 4) {
+  const chunks = []
+  let bytes = 0
+  return {
+    push(value) {
+      const chunk = Buffer.from(value)
+      chunks.push(chunk)
+      bytes += chunk.byteLength
+      // Network reads may split a 32-bit PCM sample. Always discard a whole
+      // number of samples so the retained buffer still begins on a sample
+      // boundary.
+      let discard = Math.ceil(Math.max(0, bytes - maxBytes) / sampleBytes) * sampleBytes
+      while (discard > 0 && chunks.length) {
+        const count = Math.min(discard, chunks[0].byteLength)
+        chunks[0] = chunks[0].subarray(count)
+        if (!chunks[0].byteLength) chunks.shift()
+        bytes -= count
+        discard -= count
+      }
+    },
+    snapshot() {
+      const completeBytes = bytes - (bytes % sampleBytes)
+      return Buffer.concat(chunks, bytes).subarray(0, completeBytes)
+    },
+    clear() { chunks.length = 0; bytes = 0 },
+    get byteLength() { return bytes }
   }
 }

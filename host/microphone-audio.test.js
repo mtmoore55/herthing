@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { createPcmEnergyAnalyzer, createSpeechEndpointDetector } from './microphone-audio.js'
+import { createPcmEnergyAnalyzer, createPcmRingBuffer, createSpeechEndpointDetector } from './microphone-audio.js'
 
 function pcm32(values) {
   const bytes = new Uint8Array(values.length * 4)
@@ -27,6 +27,17 @@ describe('PCM microphone energy', () => {
     const analyzer = createPcmEnergyAnalyzer()
     expect(analyzer.analyze(new Uint8Array([1, 0])).samples).toBe(0)
     expect(analyzer.analyze(new Uint8Array([0, 0])).samples).toBe(1)
+  })
+})
+
+describe('PCM pre-roll buffer', () => {
+  test('retains newest audio on a sample boundary across fragmented chunks', () => {
+    const ring = createPcmRingBuffer(8)
+    ring.push(Buffer.from([1, 2, 3]))
+    ring.push(Buffer.from([4, 5, 6, 7, 8, 9]))
+    ring.push(Buffer.from([10, 11, 12]))
+    expect([...ring.snapshot()]).toEqual([5, 6, 7, 8, 9, 10, 11, 12])
+    expect(ring.byteLength).toBe(8)
   })
 })
 

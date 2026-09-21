@@ -16,10 +16,11 @@ describe('ambient wake phrase', () => {
 
 describe('conversation sleep intent', () => {
   test('recognizes natural closings', () => {
-    for (const phrase of ["OK, that's it.", 'Okay, thank you!', 'Thanks Ziggy', "That's all", "We're done", 'Goodnight Ziggy']) expect(isSleepIntent(phrase)).toBe(true)
+    for (const phrase of ["OK, that's it.", 'Okay, thank you!', 'Thanks Ziggy', "That's all", "We're done", 'Goodnight Ziggy', "Nah, I'm good, we're done.", "Yeah, okay, that's it.", "Alright, that's it. Thanks.", "That's all, thank you Ziggy.", "I'm done", 'Stop listening', 'End the conversation', 'You can stop', 'Never mind', 'Cancel', 'Goodbye Ziggy', 'Bye', 'See you', 'Talk to you later', 'Talk to you later. Bye.', 'Goodbye, thanks Ziggy']) expect(isSleepIntent(phrase)).toBe(true)
   })
   test('does not eat a continuing request', () => {
     expect(isSleepIntent('Okay thank you, but what is next?')).toBe(false)
     expect(isSleepIntent('Tell Andy thank you')).toBe(false)
+    expect(isSleepIntent("Tell me when we're done")).toBe(false)
   })
 })

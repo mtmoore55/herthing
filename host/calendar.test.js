@@ -72,4 +72,14 @@ END:VCALENDAR\r
     expect(result.next_event?.title).toBe('Call Andy')
     expect(result.today_events).toHaveLength(2)
   })
+
+  test('leaves the display empty when the next event is not today', async () => {
+    const result = await fetchCalendarState(
+      { url: 'https://example.test/me.ics' },
+      new Date('2026-09-19T23:00:00Z'),
+      async () => new Response(calendar)
+    )
+    expect(result.next_event).toBeNull()
+    expect(result.today_events).toEqual([])
+  })
 })

@@ -74,7 +74,8 @@ export async function fetchCalendarState(config, now = new Date(), fetchImpl = f
   dayStart.setHours(0, 0, 0, 0)
   const dayEnd = new Date(dayStart)
   dayEnd.setDate(dayEnd.getDate() + 1)
-  return { next_event: findNextEvent(ics, now), today_events: findEventsBetween(ics, now, dayEnd) }
+  const todayEvents = findEventsBetween(ics, now, dayEnd)
+  return { next_event: todayEvents[0] || null, today_events: todayEvents }
 }
 
 export async function fetchNextEvent(config, now = new Date(), fetchImpl = fetch) {

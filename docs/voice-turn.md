@@ -58,6 +58,20 @@ Whisper ambient captions such as `[typing]`, `[applause]`, and `[laughs]` are
 discarded before the assistant boundary. They remain neither conversation turns
 nor stored raw audio.
 
+## Speaker-aware attention
+
+After three knob-triggered enrollment samples, each candidate wake and active
+conversation turn receives a local 256-value speaker embedding. The host
+compares it with the averaged local profile before crossing the assistant
+boundary. An unmatched wake closes locally; an unmatched background turn is
+ignored without closing the current session. Raw enrollment and turn audio stay
+memory-only. The profile contains embeddings, not recordings, and lives in the
+private HerThing configuration directory.
+
+The host emits a temporary provider-neutral `notification` object with
+`kind: "voice_ignored"` when it filters a turn. This supports a quiet visual cue
+without a spoken correction that would interrupt the enrolled speaker.
+
 The Meta adapter carries `previous_response_id` across turns, so corrections,
 pronouns, and follow-ups share server-managed context without coupling the
 device UI to Muse internals.
