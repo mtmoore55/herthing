@@ -4,10 +4,11 @@ import { askMuseBrowser } from './muse-browser.js'
 const museBinary = process.env.HERTHING_MUSE_BINARY || 'muse'
 const museModel = process.env.HERTHING_MUSE_MODEL || 'muse-spark-1.3'
 const metaBaseUrl = process.env.HERTHING_META_BASE_URL || 'https://api.meta.ai/v1'
-let previousMetaResponseId = null
+const previousMetaResponseIds = new Map()
+const defaultConversationId = 'local-voice'
 
-export function resetAssistantConversation() {
-  previousMetaResponseId = null
+export function resetAssistantConversation(conversationId = defaultConversationId) {
+  previousMetaResponseIds.delete(conversationId)
 }
 
 function minutesUntil(event) {
@@ -109,7 +110,7 @@ function parseMetaResponse(response) {
     .trim()
 }
 
-async function metaResponse(text, context) {
+async function metaResponse(text, context, conversationId) {
   const key = metaApiKey()
   if (!key) throw new Error('Meta Model API key is not configured')
   const body = {
@@ -122,6 +123,7 @@ async function metaResponse(text, context) {
     // entire response budget before output_text is emitted.
     max_output_tokens: 800
   }
+  const previousMetaResponseId = previousMetaResponseIds.get(conversationId)
   if (previousMetaResponseId) body.previous_response_id = previousMetaResponseId
   const response = await fetch(`${metaBaseUrl}/responses`, {
     method: 'POST',
@@ -133,7 +135,7 @@ async function metaResponse(text, context) {
   if (!response.ok) throw new Error(result?.error?.message || `Meta Model API returned ${response.status}`)
   const output = parseMetaResponse(result)
   if (!output) throw new Error('Meta Model API returned no assistant text')
-  previousMetaResponseId = result.id || previousMetaResponseId
+  if (result.id) previousMetaResponseIds.set(conversationId, result.id)
   return output
 }
 
@@ -159,12 +161,12 @@ export function assistantConfig() {
   return { provider: process.env.HERTHING_ASSISTANT_PROVIDER || 'local' }
 }
 
-export async function askAssistant(text, context = {}) {
+export async function askAssistant(text, context = {}, { conversationId = defaultConversationId } = {}) {
   const { provider } = assistantConfig()
   const started = performance.now()
   let usedProvider = provider
   let response
-  if (provider === 'meta') response = await metaResponse(text, context)
+  if (provider === 'meta') response = await metaResponse(text, context, conversationId)
   else if (provider === 'muse') response = await museResponse(text, context)
   else if (provider === 'muse-browser') {
     try {
@@ -172,7 +174,7 @@ export async function askAssistant(text, context = {}) {
     } catch (error) {
       if (error.code !== 'MUSE_BROWSER_UNAVAILABLE') throw error
       console.warn('[assistant:muse-browser] unavailable before submission; falling back to Meta Model API')
-      response = await metaResponse(text, context)
+      response = await metaResponse(text, context, conversationId)
       usedProvider = 'meta-fallback'
     }
   } else response = localResponse(text, context)

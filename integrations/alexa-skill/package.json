@@ -1,0 +1,11 @@
+{
+  "name": "herthing-alexa-skill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/index.test.js",
+    "package": "zip -j ziggy-alexa-lambda.zip index.js package.json"
+  },
+  "engines": { "node": ">=20" }
+}

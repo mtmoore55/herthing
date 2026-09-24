@@ -1,0 +1,27 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "ziggy assistant",
+      "intents": [
+        {
+          "name": "AskZiggyIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "{query}",
+            "ask Ziggy {query}",
+            "tell me {query}",
+            "I want to know {query}",
+            "help me with {query}"
+          ]
+        },
+        { "name": "ThanksZiggyIntent", "samples": ["thanks Ziggy", "thank you Ziggy", "thanks"] },
+        { "name": "GoodbyeIntent", "samples": ["goodbye", "goodbye Ziggy", "bye Ziggy", "talk to you later"] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] }
+      ],
+      "types": []
+    }
+  }
+}

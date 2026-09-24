@@ -142,6 +142,14 @@ detector is installed, running, and ready. `HERTHING_WAKE_COMMAND_GRACE_MS`
 (default `1400`) keeps the wake-word boundary from cutting off a request spoken
 immediately after `Ziggy`.
 
+Set `HERTHING_STREAMING_STT=shadow` to run the pinned streaming Zipformer beside
+Whisper without changing assistant input. The `[stt:shadow]` and `[turn:<id>]`
+logs compare accuracy and end-of-speech latency. After a physical evaluation,
+`HERTHING_STREAMING_STT=1` makes streaming output authoritative while retaining
+Whisper as an automatic failure fallback. `HERTHING_STREAMING_STT_THREADS`
+defaults to `2` so the two-core shed host retains capacity for wake detection,
+speaker verification, Chromium, and audio.
+
 During an active conversation, the same local detector closes the session on
 phrases including `okay, that's it`, `thank you`, `thanks Ziggy`, `we're done`,
 `all done`, `stop listening`, `go to sleep`, and `good night Ziggy`. These are

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { executeMediaCommand, normalizePlayback, readSpotifyDevices, setSpotifyTokenForTest } from './media-player.js'
+import { executeMediaCommand, normalizePlayback, readLocalSpotifyReceiver, readSpotifyDevices, setSpotifyTokenForTest } from './media-player.js'
 
 describe('media player adapter', () => {
   test('normalizes Spotify playback', () => {
@@ -65,5 +65,14 @@ describe('media player adapter', () => {
     setSpotifyTokenForTest({ access_token: 'test', expires_at: '2099-01-01T00:00:00.000Z' })
     const fakeFetch = async () => Response.json({ devices: [{ id: 'shed', name: 'HerThing Shed', type: 'Computer', is_active: false, is_restricted: false, volume_percent: 72 }] })
     expect(await readSpotifyDevices(fakeFetch)).toEqual([{ id: 'shed', name: 'HerThing Shed', type: 'Computer', active: false, restricted: false, volume: 72 }])
+  })
+
+  test('discovers the local HerThing receiver without the Spotify device API', async () => {
+    const fakeFetch = async () => Response.json({
+      deviceID: 'shed', remoteName: 'HerThing Shed', deviceType: 'Speaker', statusString: 'OK'
+    })
+    expect(await readLocalSpotifyReceiver(fakeFetch)).toEqual({
+      id: 'shed', name: 'HerThing Shed', type: 'Speaker', active: false, restricted: false, volume: null
+    })
   })
 })

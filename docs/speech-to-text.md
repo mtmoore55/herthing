@@ -47,3 +47,32 @@ is still utterance-batched recognition rather than genuinely streaming STT.
 This latency does not meet the conversational product target. Next, benchmark a
 genuinely streaming CPU recognizer such as sherpa-onnx Zipformer. Whisper can
 remain an accuracy fallback or be replaced by a hosted streaming STT adapter.
+
+## Streaming shadow path
+
+HerThing now includes an opt-in persistent Sherpa-ONNX Zipformer recognizer.
+It consumes live S32 LE microphone chunks while capture is still open and emits
+partial hypotheses before the VAD endpoint. Batch Whisper remains authoritative
+in shadow mode:
+
+```sh
+./scripts/prepare-voice-front-end.sh
+HERTHING_STREAMING_STT=shadow bun run host/server.js
+```
+
+Each turn logs `[stt:shadow]` with time to first partial, streaming final
+latency, and both transcripts. Structured `[turn:<id>]` JSON logs put capture,
+endpoint, both recognizers, speaker verification, assistant, and TTS timing on
+one monotonic timeline. `/health` reports whether the worker is ready.
+
+Run the pinned model's included sample in real time or as fast as the CPU can
+decode it:
+
+```sh
+bun benchmarks/streaming-stt.js
+bun benchmarks/streaming-stt.js --fast
+```
+
+Do not promote streaming output until physical Car Thing turns show acceptable
+accuracy. Set `HERTHING_STREAMING_STT=1` only after that gate; an empty or
+failed streaming result automatically falls back to batch Whisper.

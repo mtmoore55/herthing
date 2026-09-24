@@ -38,32 +38,45 @@ export function createSpeechEndpointDetector({
   startupDelayMs = 450,
   minimumSpeechMs = 300,
   trailingSilenceMs = 650,
-  initialSpeechMs = 0
+  initialSpeechMs = 0,
+  adaptiveNoiseMarginDb = 0,
+  adaptiveSilenceMarginDb = 0
 } = {}) {
   let voicedMs = initialSpeechMs
   let quietMs = 0
   let armed = voicedMs >= minimumSpeechMs
   let elapsedMs = 0
+  let noiseFloorDb = Infinity
 
   return {
     update(measurement) {
       const durationMs = measurement.samples / sampleRate * 1000
       elapsedMs += durationMs
       if (elapsedMs < startupDelayMs) {
+        noiseFloorDb = Math.min(noiseFloorDb, measurement.db)
         return { speech_detected: false, trailing_silence_ms: 0, endpoint: false }
       }
+      const effectiveSpeechDb = Number.isFinite(noiseFloorDb) && adaptiveNoiseMarginDb
+        ? Math.max(speechDb, noiseFloorDb + adaptiveNoiseMarginDb)
+        : speechDb
+      const effectiveSilenceDb = Number.isFinite(noiseFloorDb) && adaptiveSilenceMarginDb
+        ? Math.max(silenceDb, noiseFloorDb + adaptiveSilenceMarginDb)
+        : silenceDb
       if (!armed) {
-        voicedMs = measurement.db >= speechDb
+        voicedMs = measurement.db >= effectiveSpeechDb
           ? voicedMs + durationMs
           : Math.max(0, voicedMs - durationMs * 0.5)
         armed = voicedMs >= minimumSpeechMs
       } else {
-        quietMs = measurement.db < silenceDb ? quietMs + durationMs : 0
+        quietMs = measurement.db < effectiveSilenceDb ? quietMs + durationMs : 0
       }
       return {
         speech_detected: armed,
         trailing_silence_ms: Math.round(quietMs),
-        endpoint: armed && quietMs >= trailingSilenceMs
+        endpoint: armed && quietMs >= trailingSilenceMs,
+        noise_floor_db: Number.isFinite(noiseFloorDb) ? noiseFloorDb : null,
+        speech_threshold_db: effectiveSpeechDb,
+        silence_threshold_db: effectiveSilenceDb
       }
     }
   }

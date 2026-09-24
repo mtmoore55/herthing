@@ -192,7 +192,7 @@
     $('event-empty').classList.toggle('hidden', !!event)
     $('event-state').classList.toggle('hidden', !event)
     if (!event) return
-    $('event-title').textContent = event.title
+    setMarqueeText('event-title', event.title)
     $('event-time').textContent = formatTime(new Date(event.starts_at))
     $('event-location').textContent = event.location || ''
     renderEventRelative(new Date(Date.now() + hostClockSkewMs))
@@ -202,11 +202,12 @@
     var events = state.today_events || []
     var list = $('agenda-list')
     if (!events.length) { list.innerHTML = '<div class="agenda-empty">Nothing else on your calendar today.</div>'; return }
-    list.innerHTML = events.map(function (event) {
+    list.innerHTML = events.map(function (event, index) {
       var time = event.all_day ? 'ALL DAY' : formatTime(new Date(event.starts_at))
       var location = event.location ? '<span>' + escapeHtml(event.location) + '</span>' : ''
-      return '<article class="agenda-item" tabindex="-1"><time class="agenda-time">' + time + '</time><i aria-hidden="true"></i><div class="agenda-copy"><strong>' + escapeHtml(event.title) + '</strong>' + location + '</div></article>'
+      return '<article class="agenda-item" tabindex="-1"><time class="agenda-time">' + time + '</time><i aria-hidden="true"></i><div class="agenda-copy"><strong class="marquee-window"><span id="agenda-event-title-' + index + '">' + escapeHtml(event.title) + '</span></strong>' + location + '</div></article>'
     }).join('')
+    events.forEach(function (event, index) { setMarqueeText('agenda-event-title-' + index, event.title) })
   }
 
   function escapeHtml(value) {
@@ -234,9 +235,12 @@
     element.dataset.marqueeReady = 'false'
     element.classList.remove('marquee-active')
     element.parentElement.classList.remove('is-marquee')
-    setTimeout(function () {
+    function measure() {
+      if (!element.parentElement) return
       var windowWidth = element.parentElement.clientWidth
       var overflow = element.scrollWidth - windowWidth
+      element.parentElement.classList.remove('is-marquee')
+      element.classList.remove('marquee-active')
       if (overflow > 2) {
         var shift = overflow + 24
         element.style.setProperty('--marquee-shift', '-' + shift + 'px')
@@ -245,7 +249,11 @@
         element.classList.add('marquee-active')
       }
       element.dataset.marqueeReady = 'true'
-    }, 80)
+    }
+    setTimeout(measure, 80)
+    // Event prominence animates its font size. Measure again after that
+    // transition so the final marquee distance matches the rendered title.
+    if (id === 'event-title') setTimeout(measure, 2000)
   }
 
   function renderTrack() {

@@ -1,10 +1,12 @@
 import { fetchWeather, weatherConfig } from './weather.js'
 import { calendarConfig, fetchCalendarState } from './calendar.js'
-import { executeMediaCommand, readNowPlaying, readSpotifyDevices } from './media-player.js'
+import { executeMediaCommand, readLocalPlayback, readLocalSpotifyReceiver, readNowPlaying, readSpotifyDevices } from './media-player.js'
 import { setSystemVolume } from './system-volume.js'
 import { createPcmEnergyAnalyzer, createPcmRingBuffer, createSpeechEndpointDetector } from './microphone-audio.js'
 import { isDismissalKeyword, wakeDetectorConfig, WakeDetector } from './wake-detector.js'
 import { transcribeS32le } from './stt-whisper.js'
+import { StreamingRecognizer, streamingRecognizerConfig } from './stt-streaming.js'
+import { TurnMetrics } from './turn-metrics.js'
 import { askAssistant, assistantConfig, resetAssistantConversation } from './assistant.js'
 import { museBrowserHealth } from './muse-browser.js'
 import { cancelSpeech, speak, speechConfig } from './speech.js'
@@ -12,10 +14,12 @@ import { extractWakeCommand, isSleepIntent } from './conversation-intents.js'
 import { playDismissalEarcon } from './earcon.js'
 import { addEnrollmentSample, extractSpeakerEmbedding, verifySpeaker } from './speaker-verification.js'
 import { appendNote, matchNoteIntent, mentionsTasks, noteConfirmation, notesConfig, readOpenTodos } from './notes.js'
+import { createAlexaConversationHandler } from './alexa-conversation.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
 const port = Number(process.env.HERTHING_PORT || 8787)
+const alexaGatewayPort = Number(process.env.HERTHING_ALEXA_GATEWAY_PORT || 8788)
 const deviceControlUrl = process.env.HERTHING_DEVICE_CONTROL_URL || 'http://172.16.42.2:8790/cgi-bin/microphone'
 const clients = new Set()
 let activeMicrophoneStream = null
@@ -24,7 +28,8 @@ const followupDelayMs = Number(process.env.HERTHING_FOLLOWUP_DELAY_MS || 300)
 const noSpeechCycleMs = Number(process.env.HERTHING_NO_SPEECH_CYCLE_MS || 15000)
 const wakeCommandGraceMs = Number(process.env.HERTHING_WAKE_COMMAND_GRACE_MS || 1400)
 const wakePreRollMs = Number(process.env.HERTHING_WAKE_PRE_ROLL_MS || 1800)
-const wakeCaptureMaxMs = Number(process.env.HERTHING_WAKE_CAPTURE_MAX_MS || 12000)
+const wakeCaptureMaxMs = Number(process.env.HERTHING_WAKE_CAPTURE_MAX_MS || 6000)
+const conversationCaptureMaxMs = Number(process.env.HERTHING_CONVERSATION_CAPTURE_MAX_MS || 20000)
 // Car Thing's microphone noise floor can keep the energy VAD open until the
 // rolling ambient buffer reaches its 15 s cap. Permit that complete buffer;
 // concurrency and cooldown below prevent it from becoming an STT backlog.
@@ -58,6 +63,7 @@ const dismissalDetector = new WakeDetector({
   ...wakeDetectorConfig(),
   keywords: `${import.meta.dir}/keywords/dismissals.txt`
 })
+const streamingRecognizer = new StreamingRecognizer(streamingRecognizerConfig())
 
 let revision = 1
 let state = {
@@ -155,6 +161,31 @@ function beginConversation() {
   resetAssistantConversation()
   extendConversation()
   acquireConversationAudioFocus()
+}
+
+async function activateConversation(source = 'manual') {
+  if (conversationActive) {
+    extendConversation()
+    return false
+  }
+  beginConversation()
+  mergeState({
+    microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 },
+    transcript: null,
+    assistant_response: null
+  })
+  try {
+    // Ambient capture may already own the device. Stop it first so the
+    // replacement stream is classified as conversational.
+    await controlMicrophone('off')
+    await controlMicrophone('start')
+    console.log(`[conversation] activated by ${source}`)
+    return true
+  } catch (error) {
+    console.error(`[conversation] ${source} activation failed:`, error.message || error)
+    endConversation()
+    throw error
+  }
 }
 
 function publishNotification(kind, text, durationMs = 1800) {
@@ -282,7 +313,7 @@ async function askAssistantInOrder(text, context) {
 // Capture is answered from the vault, not the assistant. Routing it through
 // the relay would add a round trip to the one kind of turn whose whole value
 // is being immediate, and would fail whenever the relay or the network does.
-async function resolveVoiceResponse(spokenRequest, rawTranscript) {
+async function resolveVoiceResponse(spokenRequest, rawTranscript, conversationId) {
   if (configuredNotes) {
     // Prefer the untouched transcript. Ambient wake extraction lowercases and
     // strips punctuation, and a saved note should read the way it was spoken.
@@ -304,8 +335,16 @@ async function resolveVoiceResponse(spokenRequest, rawTranscript) {
   const context = configuredNotes && mentionsTasks(spokenRequest)
     ? { ...state, todos: await readOpenTodos(configuredNotes).catch(() => []) }
     : state
+  if (conversationId) return askAssistant(spokenRequest, context, { conversationId })
   return askAssistantInOrder(spokenRequest, context)
 }
+
+const alexaConversationHandler = createAlexaConversationHandler({
+  secret: process.env.HERTHING_ALEXA_GATEWAY_TOKEN,
+  resolveTurn: (text, conversationId) => resolveVoiceResponse(text, text, `alexa:${conversationId}`),
+  endConversation: (conversationId) => resetAssistantConversation(`alexa:${conversationId}`),
+  timeoutMs: Number(process.env.HERTHING_ALEXA_TIMEOUT_MS || 6500)
+})
 
 function enqueueVoiceTurn(task) {
   pendingVoiceTurns += 1
@@ -321,9 +360,32 @@ function enqueueVoiceTurn(task) {
   return run
 }
 
-async function processVoiceTurn({ pcm, ambientStream, wakeEvent }) {
+async function processVoiceTurn({ pcm, ambientStream, wakeEvent, streamingFinal, metrics }) {
   try {
-    const transcription = await transcribeS32le(pcm)
+    metrics?.mark('stt_batch_started')
+    const batchPromise = streamingRecognizer.config.shadow || !streamingFinal
+      ? transcribeS32le(pcm)
+      : null
+    let streamingTranscription = null
+    if (streamingFinal) {
+      try {
+        streamingTranscription = await streamingFinal
+        metrics?.mark('stt_streaming_final')
+      } catch (error) {
+        console.warn('[stt:streaming] final unavailable; using batch fallback:', error.message || error)
+      }
+    }
+    let batchTranscription = batchPromise ? await batchPromise : null
+    if (!streamingRecognizer.config.shadow && !streamingTranscription?.text && !batchTranscription) {
+      batchTranscription = await transcribeS32le(pcm)
+    }
+    if (batchTranscription) metrics?.mark('stt_batch_final')
+    const transcription = !streamingRecognizer.config.shadow && streamingTranscription?.text
+      ? streamingTranscription
+      : batchTranscription || streamingTranscription || { text: '', elapsed_ms: 0 }
+    if (streamingTranscription && batchTranscription) {
+      console.log(`[stt:shadow] partial=${streamingTranscription.first_partial_ms ?? 'none'} ms; final=${streamingTranscription.elapsed_ms} ms; streaming=${JSON.stringify(streamingTranscription.text)}; batch=${JSON.stringify(batchTranscription.text)}`)
+    }
     const wake = ambientStream ? extractWakeCommand(transcription.text) : null
     const kwsCommand = wakeEvent && !wake ? transcription.text.trim().replace(/^\S+[\s,.:;!?-]*/, '') : null
     const spokenRequest = ambientStream ? (wake?.command ?? kwsCommand) : transcription.text
@@ -332,7 +394,9 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent }) {
 
     let speakerAccepted = true
     if (spokenRequest && (!ambientStream || wake || wakeEvent)) {
+      metrics?.mark('speaker_started')
       const verification = await verifySpeaker(pcm)
+      metrics?.mark('speaker_finished')
       if (verification.enabled) {
         console.log(`[speaker] ${verification.match ? 'accepted' : 'ignored'} ${verification.name}; score=${verification.score?.toFixed(3)} threshold=${verification.threshold}`)
         speakerAccepted = verification.match
@@ -373,7 +437,9 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent }) {
       endConversation({ earcon: true })
     } else if (spokenRequest) {
       extendConversation()
+      metrics?.mark('assistant_started')
       const assistant = await resolveVoiceResponse(spokenRequest, transcription.text)
+      metrics?.mark('assistant_finished')
       if (conversationActive) {
         console.log(`[assistant:${assistant.provider}] ${assistant.elapsed_ms} ms: ${assistant.text}`)
         if (activeMicrophoneStream && activeCaptureHasSpeech) {
@@ -387,7 +453,9 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent }) {
           }
           mergeState({ assistant_response: assistant.text, microphone: { mode: 'conversation', activity: 'speaking', user_energy: 0, assistant_energy: 0.45 } })
           try {
+            metrics?.mark('tts_started')
             const speech = await speak(assistant.text)
+            metrics?.markAfter('tts_first_audio', 'tts_started', speech.first_audio_ms).mark('tts_finished')
             console.log(`[tts] first audio ${speech.first_audio_ms ?? 'unknown'} ms; complete ${speech.elapsed_ms} ms${speech.skipped ? ' (disabled)' : speech.cancelled ? ' (cancelled)' : ''}`)
           } finally {
             voiceOutputActive = false
@@ -398,6 +466,7 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent }) {
   } catch (error) {
     console.error('[voice] turn failed:', error.message || error)
   } finally {
+    metrics?.mark('turn_finished').log()
     if (conversationActive && !activeMicrophoneStream && !voiceOutputActive) scheduleFollowup()
     else if (microphoneEnabled && !conversationActive && !activeMicrophoneStream) scheduleAmbient()
   }
@@ -421,7 +490,14 @@ async function refreshNowPlaying() {
   if (refreshingNowPlaying) return
   refreshingNowPlaying = true
   try {
-    const nowPlaying = await readNowPlaying()
+    const localReceiver = await readLocalSpotifyReceiver()
+    let nowPlaying = state.now_playing || readLocalPlayback(localReceiver)
+    try {
+      nowPlaying = await readNowPlaying() || readLocalPlayback(localReceiver)
+    } catch (error) {
+      nowPlaying = readLocalPlayback(localReceiver) || nowPlaying
+      console.error('[spotify] playback refresh failed:', error.message || error)
+    }
     let spotifyDevices = state.spotify_devices
     if (Date.now() - lastSpotifyDevicesRefresh >= 5 * 60 * 1000) {
       lastSpotifyDevicesRefresh = Date.now()
@@ -430,6 +506,15 @@ async function refreshNowPlaying() {
       } catch (error) {
         console.error('[spotify] device refresh failed:', error.message || error)
       }
+      if (localReceiver && !spotifyDevices.some((device) => device.id === localReceiver.id)) {
+        spotifyDevices = [...spotifyDevices, localReceiver]
+      }
+    }
+    if (nowPlaying?.device_id) {
+      spotifyDevices = spotifyDevices.map((device) => ({
+        ...device,
+        active: device.id === nowPlaying.device_id
+      }))
     }
     if (nowPlaying?.artwork_source_url) {
       nowPlaying.art_url = `http://${bindHost}:${port}/api/artwork?v=${artworkVersion(nowPlaying.artwork_source_url)}`
@@ -438,7 +523,7 @@ async function refreshNowPlaying() {
       mergeState({ now_playing: nowPlaying, spotify_devices: spotifyDevices })
     }
   } catch (error) {
-    console.error('[spotify] playback refresh failed:', error.message || error)
+    console.error('[spotify] refresh failed:', error.message || error)
   } finally {
     refreshingNowPlaying = false
   }
@@ -491,7 +576,8 @@ const server = Bun.serve({
         : { provider: assistantConfig().provider, ok: true }
       return Response.json({
         ok: true, protocol, revision, clients: clients.size, assistant,
-        wake_word: wakeDetector.status(), dismissal: dismissalDetector.status()
+        wake_word: wakeDetector.status(), dismissal: dismissalDetector.status(),
+        streaming_stt: streamingRecognizer.status()
       })
     }
 
@@ -521,6 +607,25 @@ const server = Bun.serve({
         return Response.json(snapshot())
       } catch (error) {
         return Response.json({ error: String(error.message || error) }, { status: 400 })
+      }
+    }
+
+    if (url.pathname === '/api/alexa/conversation' && request.method === 'POST') {
+      return alexaConversationHandler(request)
+    }
+
+    if (url.pathname === '/api/conversation/toggle' && request.method === 'POST') {
+      try {
+        if (conversationActive) {
+          endConversation()
+          await controlMicrophone('off')
+          console.log('[conversation] ended by keyboard')
+          return Response.json({ ok: true, action: 'sleep', conversation: snapshot().conversation })
+        }
+        await activateConversation('keyboard')
+        return Response.json({ ok: true, action: 'wake', conversation: snapshot().conversation })
+      } catch (error) {
+        return Response.json({ error: error.message || String(error) }, { status: 502 })
       }
     }
 
@@ -556,6 +661,15 @@ const server = Bun.serve({
       const enrollmentStream = Boolean(enrollment)
       const ambientStream = !conversationActive && !enrollmentStream
       const streamingWake = ambientStream && wakeDetector.available()
+      const turnMetrics = new TurnMetrics({ kind: enrollmentStream ? 'enrollment' : ambientStream ? 'ambient' : 'conversation' })
+      let streamingSession = !ambientStream && !enrollmentStream
+        ? streamingRecognizer.begin({
+            onPartial: (text) => {
+              turnMetrics.mark('stt_first_partial')
+              if (!streamingRecognizer.config.shadow) mergeState({ transcript: text })
+            }
+          })
+        : null
       console.log(`[microphone] ${enrollmentStream ? 'speaker enrollment' : ambientStream ? 'ambient' : 'conversation'} stream connected${streamingWake ? ' (streaming wake enabled)' : ''}`)
       const analyzer = createPcmEnergyAnalyzer()
       // The device capture path has a short repeatable startup transient. In
@@ -578,7 +692,9 @@ const server = Bun.serve({
         minimumSpeechMs: 350,
         speechDb: -60,
         silenceDb: -63,
-        trailingSilenceMs: 850
+        trailingSilenceMs: 850,
+        adaptiveNoiseMarginDb: 4,
+        adaptiveSilenceMarginDb: 2
       })
       const reader = request.body.getReader()
       let bytes = 0
@@ -591,6 +707,7 @@ const server = Bun.serve({
       let wakeEvent = null
       let dismissalEvent = null
       let capturedBytes = 0
+      let followupDeferredToVoiceTurn = false
       const audioChunks = []
       const preRoll = createPcmRingBuffer(16000 * 4 * wakePreRollMs / 1000)
       const ambientUtterance = createPcmRingBuffer(16000 * 4 * 15)
@@ -617,6 +734,7 @@ const server = Bun.serve({
               controlMicrophone('stop').catch((error) => console.error('[dismissal] capture stop failed:', error.message || error))
             }
           }
+          let streamingStartedThisChunk = false
           if (streamingWake && !wakeEvent) {
             preRoll.push(value)
             ambientUtterance.push(value)
@@ -627,6 +745,14 @@ const server = Bun.serve({
               const buffered = preRoll.snapshot()
               audioChunks.push(buffered)
               capturedBytes += buffered.byteLength
+              streamingSession = streamingRecognizer.begin({
+                onPartial: (text) => {
+                  turnMetrics.mark('stt_first_partial')
+                  if (!streamingRecognizer.config.shadow) mergeState({ transcript: text })
+                }
+              })
+              streamingSession?.write(buffered)
+              streamingStartedThisChunk = Boolean(streamingSession)
               speechDetected = true
               endpointDetector = createSpeechEndpointDetector({
                 // A keyword spotter commonly finalizes during the natural
@@ -654,13 +780,16 @@ const server = Bun.serve({
             audioChunks.push(value.slice())
             capturedBytes += value.byteLength
           }
+          if (streamingSession && !streamingStartedThisChunk) streamingSession.write(value)
           if ((!ambientStream || wakeEvent || !streamingWake) && capturedBytes > 16000 * 4 * 60) {
             throw new Error('microphone utterance exceeded 60 second safety limit')
           }
           const endpoint = dismissalEvent
             ? { speech_detected: false, endpoint: false }
             : endpointDetector.update(measurement)
+          const hadSpeech = speechDetected
           speechDetected ||= endpoint.speech_detected
+          if (!hadSpeech && speechDetected) turnMetrics.mark('speech_started')
           if (activeMicrophoneStream === streamId && speechDetected) activeCaptureHasSpeech = true
           loudestDb = Math.max(loudestDb, measurement.db)
           peakEnergy = Math.max(peakEnergy, measurement.energy)
@@ -668,6 +797,7 @@ const server = Bun.serve({
           const enrollmentMinimumReached = !enrollmentStream || bytes >= 16000 * 4 * 5
           if (!autoStopRequested && endpoint.endpoint && enrollmentMinimumReached) {
             autoStopRequested = true
+            turnMetrics.mark('speech_ended')
             if (ambientStream && !wakeEvent) {
               const buffered = ambientUtterance.snapshot()
               audioChunks.push(buffered)
@@ -687,6 +817,12 @@ const server = Bun.serve({
             mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
             console.log(`[vad] wake turn capped after ${Math.round(capturedBytes / (16000 * 4) * 1000)} ms captured`)
             controlMicrophone('stop').catch((error) => console.error('[vad] wake cap stop failed:', error.message || error))
+          }
+          if (!ambientStream && !enrollmentStream && !autoStopRequested && capturedBytes >= 16000 * 4 * conversationCaptureMaxMs / 1000) {
+            autoStopRequested = true
+            mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
+            console.log(`[vad] conversation turn capped after ${Math.round(capturedBytes / (16000 * 4) * 1000)} ms captured`)
+            controlMicrophone('stop').catch((error) => console.error('[vad] conversation cap stop failed:', error.message || error))
           }
           const captureNoSpeechMs = enrollmentStream ? 60000 : noSpeechCycleMs
           if (!streamingWake && !autoStopRequested && !speechDetected && bytes >= 16000 * 4 * captureNoSpeechMs / 1000) {
@@ -745,19 +881,27 @@ const server = Bun.serve({
           }
           if (!ambientStream || wakeEvent) mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
           const pcm = Buffer.concat(audioChunks.map((chunk) => Buffer.from(chunk)))
-          enqueueVoiceTurn(() => processVoiceTurn({ pcm, ambientStream, wakeEvent }))
+          turnMetrics.mark('capture_finished').mark('turn_queued')
+          const streamingFinal = streamingSession?.finish()
+          streamingSession = null
+          followupDeferredToVoiceTurn = ambientStream && Boolean(wakeEvent)
+          enqueueVoiceTurn(() => processVoiceTurn({ pcm, ambientStream, wakeEvent, streamingFinal, metrics: turnMetrics }))
             .catch((error) => console.error('[voice] queued turn failed:', error.message || error))
+        } else {
+          streamingSession?.cancel()
+          streamingSession = null
         }
         // The device cannot open another upload until this response closes.
         // Acknowledge capture now; transcription, Muse and TTS run in order
         // from the background queue while the next capture can begin.
         return Response.json({ ok: true, queued: true, bytes, loudest_db: Number(loudestDb.toFixed(1)), peak_energy: Number(peakEnergy.toFixed(3)) })
       } finally {
+        streamingSession?.cancel()
         if (activeMicrophoneStream === streamId) {
           activeMicrophoneStream = null
           activeCaptureHasSpeech = false
         }
-        if (conversationActive && !activeMicrophoneStream) {
+        if (conversationActive && !activeMicrophoneStream && !followupDeferredToVoiceTurn) {
           mergeState({ microphone: { mode: 'conversation', activity: 'idle', user_energy: 0, assistant_energy: 0 } })
           scheduleFollowup()
         } else if (microphoneEnabled) {
@@ -842,18 +986,7 @@ const server = Bun.serve({
             endConversation()
             controlMicrophone('off').catch((error) => console.error('[microphone] conversation exit failed:', error.message || error))
           } else {
-            beginConversation()
-            mergeState({
-              microphone: { mode: 'conversation', activity: 'listening', user_energy: 0 },
-              transcript: null,
-              assistant_response: null
-            })
-            // Ambient capture may already own the device. Stop it first so
-            // the replacement stream is classified as conversational.
-            controlMicrophone('off').then(() => controlMicrophone('start')).catch((error) => {
-              console.error('[microphone] control failed:', error.message || error)
-              endConversation()
-            })
+            activateConversation('knob').catch(() => {})
           }
         }
         send(ws, envelope('ack', { reply_to: message.id }))
@@ -903,11 +1036,28 @@ const server = Bun.serve({
   }
 })
 
+const alexaGatewayServer = process.env.HERTHING_ALEXA_GATEWAY_TOKEN
+  ? Bun.serve({
+      hostname: '127.0.0.1',
+      port: alexaGatewayPort,
+      fetch(request) {
+        const url = new URL(request.url)
+        if (url.pathname === '/api/alexa/conversation' && request.method === 'POST') {
+          return alexaConversationHandler(request)
+        }
+        return new Response('Not found', { status: 404 })
+      }
+    })
+  : null
+
 console.log(`HerThing host ${protocol} listening on http://${server.hostname}:${server.port}`)
+if (alexaGatewayServer) console.log(`[alexa] private gateway listening on http://${alexaGatewayServer.hostname}:${alexaGatewayServer.port}`)
+else console.log('[alexa] disabled; set HERTHING_ALEXA_GATEWAY_TOKEN to enable')
 console.log(`[assistant] provider: ${assistantConfig().provider}`)
 console.log(`[tts] ${speechConfig().enabled ? 'enabled' : 'disabled'}`)
 console.log(`[wake] streaming keyword detector ${wakeDetector.start() ? 'starting' : 'unavailable; using transcription fallback'}`)
 console.log(`[dismissal] streaming detector ${dismissalDetector.start() ? 'starting' : 'unavailable; using transcription fallback'}`)
+console.log(`[stt:streaming] ${streamingRecognizer.startWorker() ? 'worker starting' : streamingRecognizer.status().enabled ? 'unavailable' : 'disabled'}`)
 initializeAmbientCapture()
 if (configuredWeather) {
   refreshWeather()
@@ -922,4 +1072,7 @@ if (configuredCalendar) {
   console.log('[calendar] disabled; set HERTHING_CALENDAR_ICS_URL to enable')
 }
 refreshNowPlaying()
-setInterval(refreshNowPlaying, 15000)
+// Development-mode Spotify applications have a deliberately small shared
+// quota. A one-minute cadence keeps ambient state useful without starving
+// explicit play, pause, and transfer commands.
+setInterval(refreshNowPlaying, 5 * 60 * 1000)

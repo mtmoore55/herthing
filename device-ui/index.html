@@ -2,7 +2,7 @@
 <html lang="en"><head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0a0a09" /><title>HerThing</title>
-  <link rel="stylesheet" href="styles.css?v=event-legibility-1" />
+  <link rel="stylesheet" href="styles.css?v=event-marquee-1" />
 </head><body>
   <main class="world" id="world" data-view="home" data-music="false">
     <canvas id="visual-field" width="160" height="96" aria-hidden="true"></canvas><div class="veil"></div><div class="grain"></div>
@@ -14,7 +14,7 @@
     </header>
     <section class="next" data-panel="calendar"><p class="eyebrow" id="event-kicker">NEXT</p>
       <div class="empty-state" id="event-empty">Calendar unavailable</div>
-      <div class="event-state hidden" id="event-state"><h1 id="event-title"></h1><p><span id="event-time"></span><strong id="event-relative"></strong><span id="event-location"></span></p></div>
+      <div class="event-state hidden" id="event-state"><h1 class="marquee-window"><span id="event-title"></span></h1><p><span id="event-time"></span><strong id="event-relative"></strong><span id="event-location"></span></p></div>
     </section>
     <section class="music" data-panel="spotify">
       <img class="album-art" id="album-art" alt="Album artwork" />
@@ -63,5 +63,5 @@
     <aside class="toast feedback" id="toast" aria-live="polite"></aside>
     <aside class="volume feedback" id="volume" aria-hidden="true"><span>VOLUME</span><strong id="volume-value">50</strong><div><i id="volume-level"></i></div></aside>
   </main>
-  <script src="visuals.js?v=contrast-floor-2"></script><script src="app.js?v=event-legibility-2"></script>
+  <script src="visuals.js?v=contrast-floor-2"></script><script src="app.js?v=event-marquee-1"></script>
 </body></html>

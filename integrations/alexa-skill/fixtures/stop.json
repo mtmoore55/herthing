@@ -1,0 +1,6 @@
+{
+  "version": "1.0",
+  "session": { "new": false, "sessionId": "test-session", "application": { "applicationId": "test-skill" }, "attributes": { "conversationId": "test-session" } },
+  "context": { "System": { "application": { "applicationId": "test-skill" }, "user": { "userId": "test-user" }, "device": { "deviceId": "test-device" } } },
+  "request": { "type": "IntentRequest", "requestId": "stop-1", "locale": "en-US", "intent": { "name": "AMAZON.StopIntent", "slots": {} } }
+}

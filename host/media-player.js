@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 
 const tokenPath = process.env.HERTHING_SPOTIFY_TOKEN_FILE || `${process.env.HOME}/.cache/spotify-player/user_client_token.json`
+const librespotStatePath = process.env.HERTHING_LIBRESPOT_STATE_FILE ||
+  `${process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid()}`}/herthing/librespot-state.json`
 const clientId = process.env.HERTHING_SPOTIFY_CLIENT_ID || 'd420a117a32841c2b3474932e49fb54b'
 let token = null
 
@@ -28,13 +30,14 @@ async function accessToken(fetchImpl = fetch, forceRefresh = false) {
   return token.access_token
 }
 
-async function spotifyRequest(path, options = {}, fetchImpl = fetch) {
+async function spotifyRequest(path, options = {}, fetchImpl = fetch, refreshOnRateLimit = false) {
   const request = async (forceRefresh) => fetchImpl(`https://api.spotify.com/v1${path}`, {
     ...options,
     headers: { ...options.headers, authorization: `Bearer ${await accessToken(fetchImpl, forceRefresh)}` }
   })
   let response = await request(false)
   if (response.status === 401) response = await request(true)
+  else if (response.status === 429 && refreshOnRateLimit) response = await request(true)
   return response
 }
 
@@ -77,6 +80,47 @@ export async function readSpotifyDevices(fetchImpl = fetch) {
   }))
 }
 
+export async function readLocalSpotifyReceiver(fetchImpl = fetch) {
+  try {
+    const response = await fetchImpl('http://127.0.0.1:4071/?action=getInfo')
+    if (!response.ok) return null
+    const receiver = await response.json()
+    if (!receiver.deviceID || receiver.statusString !== 'OK') return null
+    return {
+      id: receiver.deviceID,
+      name: receiver.remoteName || 'HerThing Shed',
+      type: receiver.deviceType || 'Speaker',
+      active: false,
+      restricted: false,
+      volume: null
+    }
+  } catch (_) {
+    return null
+  }
+}
+
+export function readLocalPlayback(receiver = null) {
+  try {
+    const playback = JSON.parse(readFileSync(librespotStatePath, 'utf8'))
+    if (!playback.track) return null
+    return {
+      track: playback.track,
+      artist: playback.artist || 'Unknown artist',
+      album: playback.album || null,
+      artwork_source_url: playback.art_url || null,
+      duration_ms: Number(playback.duration_ms || 0),
+      position_ms: Number(playback.position_ms || 0),
+      playing: Boolean(playback.playing),
+      device: receiver?.name || 'HerThing Shed',
+      device_id: receiver?.id || null,
+      shuffle: false,
+      repeat: 'off'
+    }
+  } catch (_) {
+    return null
+  }
+}
+
 const commands = {
   'spotify.pause': { path: '/me/player/pause', method: 'PUT' },
   'spotify.play': { path: '/me/player/play', method: 'PUT' },
@@ -102,7 +146,7 @@ export async function executeMediaCommand(command, context = {}, fetchImpl = fet
     options.headers = { 'content-type': 'application/json' }
     options.body = JSON.stringify(action.body)
   }
-  const response = await spotifyRequest(action.path, options, fetchImpl)
+  const response = await spotifyRequest(action.path, options, fetchImpl, true)
   if (!response.ok) throw new Error(`Spotify control returned ${response.status}`)
   return true
 }

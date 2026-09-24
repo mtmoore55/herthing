@@ -19,6 +19,8 @@ describe('wake detector configuration', () => {
 describe('streaming dismissal keywords', () => {
   test('distinguishes wake and dismissal events', () => {
     expect(isDismissalKeyword('THANK YOU ZIGGY')).toBe(true)
+    expect(isDismissalKeyword('THANKS BYE ZIGGY')).toBe(true)
+    expect(isDismissalKeyword('ZIGGY THANKS BYE ZIGGY')).toBe(true)
     expect(isDismissalKeyword("Okay, that's it.")).toBe(true)
     expect(isDismissalKeyword('Okay, thanks.')).toBe(true)
     expect(isDismissalKeyword("Alright, that's it. Thanks.")).toBe(true)

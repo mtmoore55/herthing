@@ -1,0 +1,6 @@
+{
+  "version": "1.0",
+  "session": { "new": true, "sessionId": "test-session", "application": { "applicationId": "test-skill" }, "attributes": {} },
+  "context": { "System": { "application": { "applicationId": "test-skill" }, "user": { "userId": "test-user" }, "device": { "deviceId": "test-device" } } },
+  "request": { "type": "LaunchRequest", "requestId": "launch-1", "locale": "en-US" }
+}

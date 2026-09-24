@@ -59,4 +59,21 @@ describe('speech endpoint detector', () => {
     expect(detector.update({ db: -45, samples: 200 }).speech_detected).toBe(false)
     expect(detector.update({ db: -70, samples: 250 }).speech_detected).toBe(false)
   })
+
+  test('calibrates conversation speech above steady appliance noise', () => {
+    const detector = createSpeechEndpointDetector({
+      sampleRate: 1000,
+      startupDelayMs: 500,
+      minimumSpeechMs: 300,
+      trailingSilenceMs: 500,
+      speechDb: -60,
+      silenceDb: -63,
+      adaptiveNoiseMarginDb: 4,
+      adaptiveSilenceMarginDb: 2
+    })
+    detector.update({ db: -56, samples: 499 })
+    expect(detector.update({ db: -56, samples: 500 }).speech_detected).toBe(false)
+    expect(detector.update({ db: -49, samples: 300 }).speech_detected).toBe(true)
+    expect(detector.update({ db: -56, samples: 500 }).endpoint).toBe(true)
+  })
 })
