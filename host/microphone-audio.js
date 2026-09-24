@@ -56,6 +56,8 @@ export function createSpeechEndpointDetector({
   let elapsedMs = 0
   let noiseFloorDb = Infinity
   const calibration = []
+  let idleFrames = []
+  let idleDurationMs = 0
 
   return {
     update(measurement) {
@@ -79,6 +81,24 @@ export function createSpeechEndpointDetector({
           if (duration >= halfDuration) { noiseFloorDb = frame.db; break }
         }
         calibration.length = 0
+      }
+      // Startup may contain capture noise or the tail of our own playback.
+      // Before speech arms, recover from an overestimated floor using a
+      // sustained quieter window, not an individual quiet sample.
+      if (!armed && adaptiveNoiseMarginDb) {
+        idleFrames.push({ db: measurement.db, durationMs })
+        idleDurationMs += durationMs
+        if (idleDurationMs >= 500) {
+          const sorted = idleFrames.filter(frame => frame.db > -100).sort((a, b) => a.db - b.db)
+          const half = sorted.reduce((sum, frame) => sum + frame.durationMs, 0) / 2
+          let duration = 0
+          for (const frame of sorted) {
+            duration += frame.durationMs
+            if (duration >= half) { noiseFloorDb = Math.min(noiseFloorDb, frame.db); break }
+          }
+          idleFrames = []
+          idleDurationMs = 0
+        }
       }
       const effectiveSpeechDb = Number.isFinite(noiseFloorDb) && adaptiveNoiseMarginDb
         ? Math.max(speechDb, noiseFloorDb + adaptiveNoiseMarginDb)

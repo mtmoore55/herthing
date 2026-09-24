@@ -133,3 +133,18 @@ test('energy high-pass state survives fragmented network reads', () => {
   expect(samples).toBe(whole.samples)
   expect(Math.sqrt(squares / samples)).toBeCloseTo(whole.rms, 10)
 })
+
+test('conversation recovers when capture startup is louder than the room', () => {
+  const detector = createSpeechEndpointDetector({
+    sampleRate: 1000, startupDelayMs: 850, minimumSpeechMs: 350,
+    speechDb: -60, silenceDb: -63, trailingSilenceMs: 850,
+    adaptiveNoiseMarginDb: 4, adaptiveSilenceMarginDb: 2
+  })
+  detector.update({ db: -45, samples: 450 })
+  detector.update({ db: -45, samples: 400 })
+  for (let i = 0; i < 10; i++) expect(detector.update({ db: -54, samples: 100 }).speech_detected).toBe(false)
+  const speech = detector.update({ db: -48, samples: 400 })
+  expect(speech.noise_floor_db).toBe(-54)
+  expect(speech.speech_detected).toBe(true)
+  expect(detector.update({ db: -54, samples: 850 }).endpoint).toBe(true)
+})

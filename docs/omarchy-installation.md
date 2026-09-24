@@ -221,3 +221,8 @@ low-frequency rumble therefore do not dominate endpoint calibration. Periodic
 recordings. This does not replace speech classification or guarantee rejection
 of fan noise; validate wake and follow-up turns in the actual room. Speaker
 verification remains enabled at its existing threshold.
+
+Before speech is detected, sustained quieter 500 ms windows can lower an
+inflated startup noise estimate. This allows follow-up speech to be detected
+when microphone startup or residual playback was louder than the actual room.
+The update uses a duration-weighted median and excludes digital silence.
