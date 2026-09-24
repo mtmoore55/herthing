@@ -49,7 +49,13 @@ First-write preparation is tracked in
 [docs/phase-2-preflight.md](docs/phase-2-preflight.md). The pinned Mira archive
 audit is in [docs/upstream/mira-1.2.1.md](docs/upstream/mira-1.2.1.md).
 
-## Host snapshot
+## Installation and migration
+
+See [the Omarchy installation guide](docs/omarchy-installation.md) for the current
+PC setup, private configuration, services, and Car Thing recovery. The measured
+[CPU/RX 580 comparison](docs/whisper-pc-benchmark.md) uses isolated builds.
+
+## Original Mac mini host snapshot
 
 - Omarchy 4.0.4 / Arch Linux, x86_64
 - Intel Core i5-3210M (4 logical CPUs), 15 GiB RAM

@@ -125,7 +125,8 @@ checkout is elsewhere. Install only the components you need into
   PipeWire sink unless explicitly overridden.
 - `herthing-stt`: resident CPU Whisper with the same `base.en` model as fallback.
 - `herthing-tts`: resident Piper worker.
-- `herthing-ui`: loopback-only desktop static files; open the browser separately.
+- `herthing-ui`: loopback-only desktop static files.
+- `herthing-ui-browser`: opens the desktop UI at graphical login with its own profile.
 - `herthing-muse-browser`: isolated graphical browser and private environment.
 - `herthing-librespot`: optional Spotify receiver, requires Librespot and the
   selected LAN address in `HERTHING_WIFI_ADDRESS` (historical name).
@@ -141,28 +142,49 @@ Restored the Mac mini's uncommitted source work on top of `201b9c5e`. Host tests
 browser service settings without committing them. Rebuilt native wake/speaker
 helpers and CPU Whisper; recreated Piper's Python environment.
 
-On the Ryzen 5 3600 / RX 580 PC, the development host and Dell desktop UI
-connect, and live calendar/weather and Spotify playback metadata load. CPU
-Whisper transcribes its public sample; Piper synthesizes and completes playback
-to the explicitly selected analog line-out. Audible output still needs owner
-confirmation. The built-in UI scenarios render ambient, event, music, listening,
-speaking, transcription/thinking, and mic-off states without browser exceptions;
-the microphone indicator remains visible. These are synthetic visual checks,
-not proof of live microphone capture. Temporary `herthing-*-dev` user units
-run the host, UI server/browser, Whisper, Piper, and dedicated Muse browser;
-they are not enabled for login. Stop them before starting permanent units on
-the same ports. The source USB drive is mounted read-only; Windows is untouched.
+On the Ryzen 5 3600 / RX 580 PC, the Car Thing and desktop UI both connect.
+Live calendar, weather, and Spotify playback metadata load. The owner confirmed
+that a spoken request receives an audible response through the analog speakers.
+Logs show local capture, Whisper, speaker verification, Muse, and Piper completing.
+The first working voice milestone is achieved. Synthetic UI checks also cover
+ambient/grid clock, event, music, listening, speaking, transcription/thinking,
+and the persistent microphone indicator without browser exceptions. The live
+privacy toggle was also checked: the host reports OFF and the device stops
+capture; ambient listening is restored afterward. Use Bun or curl for the
+device CGI probe: Node 26 fetch rejects its LF-only header formatting.
 
-Remaining physical validation: Car Thing microphone supervisor/preview after
-reboot, an authenticated Muse response, Spotify transport/receiver playback,
-and audible speaker output.
-The first full-parity milestone is not complete until these work together.
+Persistent user services are enabled for host, CPU STT, Piper, UI server, dedicated
+Muse browser, and desktop UI browser. The temporary development services have
+been stopped. This installs startup configuration; a full PC reboot has not been
+tested. The private environment pins the PC's actual analog PipeWire output.
+
+The Car Thing's saved UI already matched the recovered checkout byte-for-byte.
+Restoring its bind mount and microphone supervisor was sufficient; no flash or
+source upload was needed. An interface- and device-address-limited UFW rule now
+allows its connection to TCP 8787. The source USB drive remains read-only, and
+Windows is untouched.
+
+After a future Car Thing reboot, authenticate a shared SSH connection and run:
+
+```sh
+./scripts/restore-device-runtime.sh
+```
+
+The script expects a private `~/.config/herthing/device-ssh.conf` containing a
+`carthing` host with `HostName 172.16.42.2`, `User root`, a verified
+`UserKnownHostsFile`, `StrictHostKeyChecking yes`, `ControlMaster yes`, and a
+`ControlPath` inside the private HerThing config directory. Open it with
+`ssh -F ~/.config/herthing/device-ssh.conf carthing` and leave that session open.
+The recovery script uses `ControlMaster=no` to reuse that socket, fails rather
+than asking for a password, and leaves an already-mounted preview/running
+supervisor alone. The device's firmware still does not persist these runtime
+registrations across power cycles; recovery remains manual. PC user services
+restart automatically at login. Device password changes are a separate task.
 
 The voice path remains Car Thing PCM → local energy VAD/Sherpa wake and speaker
 attention → CPU Whisper → Muse browser (Meta fallback) → local Piper/PipeWire.
 Streaming Zipformer is available but disabled by default. There is no Hermes
 adapter. A future Hermes integration belongs at the existing assistant adapter
-boundary. Any CPU versus RX 580 Vulkan Whisper benchmark must use a separate
-build, the same model/audio/decoding options, warm-up plus repeated timings,
-and report wall time divided by audio duration. It has not yet been run and
-must not change the production CPU dependency during migration.
+boundary. See [the measured CPU/Vulkan comparison](whisper-pc-benchmark.md) and
+[the Jev routing evaluation](jev-evaluation.md). Neither changed production
+routing or enabled GPU inference.

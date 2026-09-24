@@ -1,0 +1,82 @@
+{
+  "source_commit": "5670d5c0bbcb148feabef84400a07cfca9aa3b30",
+  "platform": "Linux-7.1.9-arch1-2-x86_64-with-glibc2.44",
+  "audio": "jfk.wav",
+  "audio_sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+  "audio_seconds": 11.0,
+  "model": "ggml-base.en.bin",
+  "model_sha256": "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002",
+  "threads": 6,
+  "runs": 5,
+  "timing": "fresh process wall time including model load; one discarded warm-up per backend",
+  "samples": {
+    "cpu": [
+      {
+        "seconds": 0.9504412249998495,
+        "real_time_factor": 0.08640374772725905,
+        "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+      },
+      {
+        "seconds": 0.9354011100003845,
+        "real_time_factor": 0.0850364645454895,
+        "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+      },
+      {
+        "seconds": 1.0158678970001347,
+        "real_time_factor": 0.09235162700001225,
+        "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+      },
+      {
+        "seconds": 0.964406555000096,
+        "real_time_factor": 0.08767332318182691,
+        "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+      },
+      {
+        "seconds": 0.926540464000027,
+        "real_time_factor": 0.08423095127272973,
+        "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+      }
+    ],
+    "vulkan": [
+      {
+        "seconds": 0.5562111380004353,
+        "real_time_factor": 0.05056464890913048,
+        "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+      },
+      {
+        "seconds": 0.5605034390000583,
+        "real_time_factor": 0.050954858090914386,
+        "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+      },
+      {
+        "seconds": 0.554029048999837,
+        "real_time_factor": 0.05036627718180336,
+        "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+      },
+      {
+        "seconds": 0.5537902040005065,
+        "real_time_factor": 0.05034456400004605,
+        "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+      },
+      {
+        "seconds": 0.5511019609994037,
+        "real_time_factor": 0.05010017827267306,
+        "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+      }
+    ]
+  },
+  "summary": {
+    "cpu": {
+      "median_seconds": 0.9504412249998495,
+      "median_real_time_factor": 0.08640374772725905,
+      "min_seconds": 0.926540464000027,
+      "max_seconds": 1.0158678970001347
+    },
+    "vulkan": {
+      "median_seconds": 0.554029048999837,
+      "median_real_time_factor": 0.05036627718180336,
+      "min_seconds": 0.5511019609994037,
+      "max_seconds": 0.5605034390000583
+    }
+  }
+}
