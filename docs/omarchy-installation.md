@@ -207,3 +207,9 @@ the calibrated floor and thresholds (dBFS). Check these with appliances running
 if submissions are delayed or answers are suppressed as apparent interruptions.
 This remains energy-based detection, so changing or speech-like noise can still
 cause false detections; room testing is needed after changing microphone placement.
+
+Ambient wake listening also uses adaptive noise thresholds. While streaming
+keyword detection is active, a 15-second rolling audio window is checked by
+local Whisper if no normal endpoint or keyword arrives. Existing fallback
+cooldown and queue guards apply. This prevents steady noise from blocking the
+wake fallback indefinitely, at the cost of periodic local transcription work.

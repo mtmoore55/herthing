@@ -693,7 +693,9 @@ const server = Bun.serve({
         minimumSpeechMs: 300,
         speechDb: -63,
         silenceDb: -58,
-        trailingSilenceMs: 750
+        trailingSilenceMs: 750,
+        adaptiveNoiseMarginDb: 4,
+        adaptiveSilenceMarginDb: 2
       } : {
         startupDelayMs: 850,
         minimumSpeechMs: 350,
@@ -817,6 +819,21 @@ const server = Bun.serve({
             if (!ambientStream || wakeEvent) mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
             console.log(`[vad] speech endpoint after ${Math.round(capturedBytes / (16000 * 4) * 1000)} ms captured`)
             controlMicrophone('stop').catch((error) => console.error('[vad] auto-stop failed:', error.message || error))
+          }
+          // Keep the bounded Whisper wake fallback reachable even when room
+          // noise never falls below the endpoint threshold. The ring buffer,
+          // cooldown and pending-turn guard below still bound fallback work.
+          if (ambientStream && streamingWake && !wakeEvent && !autoStopRequested &&
+              bytes >= 16000 * 4 * 15) {
+            autoStopRequested = true
+            const buffered = ambientUtterance.snapshot()
+            audioChunks.push(buffered)
+            capturedBytes = buffered.byteLength
+            // KWS may miss speech in noise; let Whisper check this bounded
+            // window even if energy calibration did not arm the detector.
+            speechDetected = true
+            console.log('[wake:fallback] checking bounded ambient window (15000 ms)')
+            controlMicrophone('stop').catch((error) => console.error('[wake:fallback] capture stop failed:', error.message || error))
           }
           // Music or steady machinery can prevent an energy-only detector
           // from ever observing silence. Never let that wedge a successful

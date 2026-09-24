@@ -95,3 +95,16 @@ test('startup quiet glitch does not turn steady fan noise into speech', () => {
   expect(detector.update({ db: -56, samples: 800 }).endpoint).toBe(false)
   expect(detector.update({ db: -56, samples: 100 }).endpoint).toBe(true)
 })
+
+test('ambient endpoint can close a wake utterance above a loud fan floor', () => {
+  const detector = createSpeechEndpointDetector({
+    sampleRate: 1000, startupDelayMs: 950, minimumSpeechMs: 300,
+    speechDb: -63, silenceDb: -58, trailingSilenceMs: 750,
+    adaptiveNoiseMarginDb: 4, adaptiveSilenceMarginDb: 2
+  })
+  detector.update({ db: -49, samples: 500 })
+  detector.update({ db: -49, samples: 450 })
+  expect(detector.update({ db: -49, samples: 1000 }).speech_detected).toBe(false)
+  expect(detector.update({ db: -42, samples: 400 }).speech_detected).toBe(true)
+  expect(detector.update({ db: -49, samples: 750 }).endpoint).toBe(true)
+})
