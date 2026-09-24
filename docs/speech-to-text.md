@@ -1,13 +1,14 @@
 # Speech-to-text baseline
 
-HerThing's first STT adapter is local `whisper.cpp` with the English `tiny.en`
-model. It is a benchmarkable provider implementation, not a dependency of the
-device protocol or a final architecture decision.
+HerThing's first STT adapter is local `whisper.cpp` with the English `base.en`
+model (the historical measurements below used `tiny.en`). It is a benchmarkable
+provider implementation, not a dependency of the device protocol or a final
+architecture decision.
 
 ## Reproduce
 
 ```sh
-mise install
+mise install bun@1.4.2 cmake@4.4.3
 ./scripts/prepare-whisper.sh
 ```
 

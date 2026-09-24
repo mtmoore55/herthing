@@ -18,7 +18,7 @@ if [[ ! -f "$model" ]]; then
 fi
 printf '%s  %s\n' "$model_sha" "$model" | sha1sum --check --strict
 
-mise exec -- cmake -S "$source_dir" -B "$source_dir/build" \
+MISE_AUTO_INSTALL=false mise exec -- cmake -S "$source_dir" -B "$source_dir/build" \
   -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-  -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=ON -DGGML_CCACHE=OFF
-mise exec -- cmake --build "$source_dir/build" --target whisper-cli whisper-server -j2
+  -DGGML_VULKAN=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=ON -DGGML_CCACHE=OFF
+MISE_AUTO_INSTALL=false mise exec -- cmake --build "$source_dir/build" --target whisper-cli whisper-server -j2

@@ -1,0 +1,16 @@
+[Unit]
+Description=HerThing local desktop UI server
+Documentation=https://github.com/mtmoore55/herthing
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Code/HerThing/device-ui
+ExecStart=/usr/bin/python -m http.server 8790 --bind 127.0.0.1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=default.target

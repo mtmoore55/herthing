@@ -1,5 +1,8 @@
 # HerThing host
 
+For a clean Omarchy host or a machine migration, start with
+[the installation guide](../docs/omarchy-installation.md).
+
 The host service owns dashboard state and future assistant/integration adapters.
 It binds only to the dedicated Car Thing USB address by default.
 
@@ -16,7 +19,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now herthing-host.service
 ```
 
-The checked-in unit expects the repository at `~/herthing`. Its optional
+The checked-in unit expects the repository at `~/Code/HerThing`. Its optional
 environment file is `~/.config/herthing/environment`.
 
 ## Weather

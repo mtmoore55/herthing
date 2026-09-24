@@ -4,8 +4,8 @@ Documentation=https://github.com/mtmoore55/herthing
 
 [Service]
 Type=simple
-WorkingDirectory=%h/herthing
-ExecStart=%h/herthing/.artifacts/tts-venv/bin/python %h/herthing/host/tts-worker.py --model %h/herthing/.artifacts/tts/en_US-lessac-medium.onnx
+WorkingDirectory=%h/Code/HerThing
+ExecStart=%h/Code/HerThing/.artifacts/tts-venv/bin/python %h/Code/HerThing/host/tts-worker.py --model %h/Code/HerThing/.artifacts/tts/en_US-lessac-medium.onnx
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

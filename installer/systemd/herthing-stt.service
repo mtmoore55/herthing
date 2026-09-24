@@ -4,8 +4,8 @@ Documentation=https://github.com/mtmoore55/herthing
 
 [Service]
 Type=simple
-WorkingDirectory=%h/herthing
-ExecStart=%h/herthing/.artifacts/src/whisper.cpp/build/bin/whisper-server --model %h/herthing/.artifacts/src/whisper.cpp/models/ggml-tiny.en.bin --threads 4 --best-of 1 --beam-size 1 --language en --no-gpu --no-timestamps --host 127.0.0.1 --port 8792 --public %h/herthing/.artifacts/src/whisper.cpp/examples/server/public
+WorkingDirectory=%h/Code/HerThing
+ExecStart=%h/Code/HerThing/.artifacts/src/whisper.cpp/build/bin/whisper-server --model %h/Code/HerThing/.artifacts/src/whisper.cpp/models/ggml-base.en.bin --threads 4 --best-of 1 --beam-size 1 --language en --no-gpu --no-timestamps --host 127.0.0.1 --port 8792 --public %h/Code/HerThing/.artifacts/src/whisper.cpp/examples/server/public
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

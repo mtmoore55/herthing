@@ -5,11 +5,12 @@ PartOf=graphical-session.target
 After=graphical-session.target
 
 [Service]
+EnvironmentFile=-%h/.config/herthing/environment
 Type=simple
-WorkingDirectory=%h/herthing
+WorkingDirectory=%h/Code/HerThing
 Environment=HERTHING_MUSE_BROWSER_PROFILE=%h/.local/share/herthing/muse-browser
 Environment=HERTHING_MUSE_BROWSER_DEBUG_PORT=9333
-ExecStart=%h/herthing/scripts/start-muse-browser.sh
+ExecStart=%h/Code/HerThing/scripts/start-muse-browser.sh
 Restart=on-failure
 RestartSec=3
 

@@ -6,12 +6,11 @@ After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/herthing
+WorkingDirectory=%h/Code/HerThing
 Environment=HERTHING_HOST=172.16.42.1
 Environment=HERTHING_PORT=8787
 Environment=HERTHING_ASSISTANT_PROVIDER=meta
 Environment=HERTHING_MUSE_MODEL=muse-spark-1.3
-Environment=HERTHING_AUDIO_SINK=alsa_output.pci-0000_00_1b.0.analog-stereo
 Environment=PATH=%h/.local/share/mise/shims:/usr/local/bin:/usr/bin
 EnvironmentFile=-%h/.config/herthing/environment
 ExecStart=%h/.local/share/mise/shims/bun run host/server.js
@@ -21,6 +20,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
+ReadWritePaths=%h/.config/herthing
 
 [Install]
 WantedBy=default.target
