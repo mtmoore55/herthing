@@ -1,5 +1,8 @@
-export function createPcmEnergyAnalyzer({ sampleBytes = 4, reference = 2147483648 } = {}) {
+export function createPcmEnergyAnalyzer({ sampleBytes = 4, reference = 2147483648, sampleRate = 16000, highpassHz = 80 } = {}) {
   let remainder = new Uint8Array(0)
+  const alpha = highpassHz > 0 ? 1 / (1 + 2 * Math.PI * highpassHz / sampleRate) : 1
+  let previousInput = 0
+  let previousOutput = 0
 
   return {
     analyze(input) {
@@ -10,11 +13,16 @@ export function createPcmEnergyAnalyzer({ sampleBytes = 4, reference = 214748364
       const complete = joined.length - (joined.length % sampleBytes)
       const view = new DataView(joined.buffer, joined.byteOffset, complete)
       let squares = 0
+      let rawSquares = 0
       let peak = 0
       let samples = 0
       for (let offset = 0; offset < complete; offset += sampleBytes) {
         const value = sampleBytes === 4 ? view.getInt32(offset, true) : view.getInt16(offset, true)
-        const normalized = value / reference
+        const raw = value / reference
+        const normalized = highpassHz > 0 ? alpha * (previousOutput + raw - previousInput) : raw
+        previousInput = raw
+        previousOutput = normalized
+        rawSquares += raw * raw
         squares += normalized * normalized
         peak = Math.max(peak, Math.abs(normalized))
         samples += 1
@@ -26,7 +34,7 @@ export function createPcmEnergyAnalyzer({ sampleBytes = 4, reference = 214748364
       // -55 dBFS for conversational speech. Preserve some quiet motion while
       // mapping speech into the useful middle of the visual range.
       const energy = Math.max(0, Math.min(1, (db + 75) / 30))
-      return { samples, rms, peak, db, energy }
+      return { samples, rms, peak, db, energy, raw_db: rawSquares > 0 ? 10 * Math.log10(rawSquares / samples) : -120 }
     }
   }
 }

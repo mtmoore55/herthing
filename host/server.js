@@ -708,6 +708,7 @@ const server = Bun.serve({
       const reader = request.body.getReader()
       let bytes = 0
       let lastBroadcast = 0
+      let lastLevelLog = 0
       let loudestDb = -120
       let peakEnergy = 0
       let autoStopRequested = false
@@ -731,6 +732,10 @@ const server = Bun.serve({
           if (done) break
           bytes += value.byteLength
           const measurement = analyzer.analyze(value)
+          if (bytes - lastLevelLog >= 16000 * 4 * 5) {
+            lastLevelLog = bytes
+            console.log(`[microphone:levels] raw=${measurement.raw_db.toFixed(1)} filtered=${measurement.db.toFixed(1)} dBFS`)
+          }
           if (!ambientStream && !enrollmentStream && dismissalDetector.available()) {
             dismissalDetector.feed(value)
             const keywordEvent = dismissalDetector.takeDetection()

@@ -213,3 +213,11 @@ keyword detection is active, a 15-second rolling audio window is checked by
 local Whisper if no normal endpoint or keyword arrives. Existing fallback
 cooldown and queue guards apply. This prevents steady noise from blocking the
 wake fallback indefinitely, at the cost of periodic local transcription work.
+
+The energy analyzer now applies the same 80 Hz high-pass cutoff used by batch
+transcription, preserving filter state across network chunks. DC offset and
+low-frequency rumble therefore do not dominate endpoint calibration. Periodic
+`[microphone:levels]` diagnostics compare raw and filtered dBFS without saving
+recordings. This does not replace speech classification or guarantee rejection
+of fan noise; validate wake and follow-up turns in the actual room. Speaker
+verification remains enabled at its existing threshold.

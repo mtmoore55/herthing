@@ -108,3 +108,28 @@ test('ambient endpoint can close a wake utterance above a loud fan floor', () =>
   expect(detector.update({ db: -42, samples: 400 }).speech_detected).toBe(true)
   expect(detector.update({ db: -49, samples: 750 }).endpoint).toBe(true)
 })
+
+test('energy detection rejects DC offset while retaining speech-band motion', () => {
+  const analyzer = createPcmEnergyAnalyzer()
+  const dc = Math.round(2147483648 * 10 ** (-49 / 20))
+  analyzer.analyze(pcm32(Array(16000).fill(dc)))
+  const quiet = analyzer.analyze(pcm32(Array(1600).fill(dc)))
+  expect(quiet.raw_db).toBeGreaterThan(-50)
+  expect(quiet.db).toBeLessThan(-100)
+  const voice = analyzer.analyze(pcm32(Array.from({ length: 1600 }, (_, i) => dc + Math.round(2147483648 * 10 ** (-52 / 20) * Math.sin(2 * Math.PI * 500 * i / 16000)))))
+  expect(voice.db).toBeGreaterThan(-57)
+})
+
+test('energy high-pass state survives fragmented network reads', () => {
+  const pcm = pcm32(Array.from({ length: 1600 }, (_, i) => 7000000 + Math.round(1000000 * Math.sin(i * 0.2))))
+  const whole = createPcmEnergyAnalyzer().analyze(pcm)
+  const fragmented = createPcmEnergyAnalyzer()
+  let squares = 0, samples = 0
+  for (let i = 0; i < pcm.length; i += 137) {
+    const result = fragmented.analyze(pcm.subarray(i, i + 137))
+    squares += result.rms ** 2 * result.samples
+    samples += result.samples
+  }
+  expect(samples).toBe(whole.samples)
+  expect(Math.sqrt(squares / samples)).toBeCloseTo(whole.rms, 10)
+})
