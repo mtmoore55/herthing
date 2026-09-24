@@ -188,3 +188,13 @@ adapter. A future Hermes integration belongs at the existing assistant adapter
 boundary. See [the measured CPU/Vulkan comparison](whisper-pc-benchmark.md) and
 [the Jev routing evaluation](jev-evaluation.md). Neither changed production
 routing or enabled GPU inference.
+
+### Muse submission sound
+
+Car Thing voice requests sent through `muse-browser` play a short rising,
+two-note chime through `HERTHING_AUDIO_SINK` when the Muse page clears its
+composer or starts a new answer. This indicates that the browser accepted the
+submission; it is not a server delivery receipt. The existing descending cue
+still ends a conversation. Local commands, Alexa requests, and API fallback
+requests do not play this browser submission cue. A playback failure is logged
+without discarding the answer. No sound files or new dependencies are needed.

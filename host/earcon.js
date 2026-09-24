@@ -22,13 +22,29 @@ export function createDismissalEarcon() {
   return Buffer.from(samples.buffer)
 }
 
-export async function playDismissalEarcon() {
+export function createSubmissionEarcon() {
+  const samples = new Int16Array(Math.round(sampleRate * 0.19))
+  let offset = tone(samples, 0, 75, 659.25, 0.16)
+  offset += Math.round(sampleRate * 0.015)
+  tone(samples, offset, 100, 880, 0.14)
+  return Buffer.from(samples.buffer)
+}
+
+export function playSubmissionEarcon() {
+  return playEarcon(createSubmissionEarcon())
+}
+
+export function playDismissalEarcon() {
+  return playEarcon(createDismissalEarcon())
+}
+
+async function playEarcon(pcm) {
   const args = [process.env.HERTHING_AUDIO_PLAYER || 'pw-play']
   const sink = process.env.HERTHING_AUDIO_SINK
   if (sink) args.push('--target', sink)
   args.push('--raw', '--rate', String(sampleRate), '--channels', '1', '--format', 's16', '-')
   const player = Bun.spawn(args, { stdin: 'pipe', stdout: 'ignore', stderr: 'pipe' })
-  player.stdin.write(createDismissalEarcon())
+  player.stdin.write(pcm)
   player.stdin.end()
   const [exitCode, error] = await Promise.all([player.exited, new Response(player.stderr).text()])
   if (exitCode !== 0) throw new Error(error.trim() || `earcon player exited ${exitCode}`)

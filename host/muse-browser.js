@@ -115,7 +115,9 @@ const pageHelpers = String.raw`
     composer,
     snapshot() {
       const entries = candidates();
-      return { ready: Boolean(composer()), count: entries.length, texts: entries.map((entry) => entry.text) };
+      const input = composer();
+      const composerEmpty = input ? !(input.value ?? input.textContent ?? '').trim() : false;
+      return { ready: Boolean(input), composerEmpty, count: entries.length, texts: entries.map((entry) => entry.text) };
     },
     focusComposer() {
       const element = composer();
@@ -136,8 +138,9 @@ const pageHelpers = String.raw`
 `
 
 export class MuseBrowserClient {
-  constructor(config = museBrowserConfig()) {
+  constructor(config = museBrowserConfig(), createSession = (url) => new CdpSession(url)) {
     this.config = config
+    this.createSession = createSession
   }
 
   async targets() {
@@ -146,7 +149,7 @@ export class MuseBrowserClient {
     return response.json()
   }
 
-  async ask(text) {
+  async ask(text, { onSubmitted } = {}) {
     let submitted = false
     let cdp = null
     try {
@@ -154,7 +157,7 @@ export class MuseBrowserClient {
       if (!target?.webSocketDebuggerUrl) {
         throw new Error('Dedicated Muse browser is not open. Start it with scripts/start-muse-browser.sh')
       }
-      cdp = new CdpSession(target.webSocketDebuggerUrl)
+      cdp = this.createSession(target.webSocketDebuggerUrl)
       await cdp.connect()
       await cdp.send('Runtime.enable')
       const before = await cdp.evaluate(pageHelpers)
@@ -162,9 +165,11 @@ export class MuseBrowserClient {
       const focused = await cdp.evaluate('window.__herthingMuse.focusComposer()')
       if (!focused) throw new Error('Could not focus the Muse message composer')
       await cdp.send('Input.insertText', { text })
+      // Once Enter is attempted, retrying via another provider could duplicate the request.
+      submitted = true
       await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
       await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
-      submitted = true
+      let notified = false
 
       const deadline = Date.now() + this.config.timeoutMs
       let last = before.texts?.at(-1) || ''
@@ -174,6 +179,13 @@ export class MuseBrowserClient {
         const current = await cdp.evaluate('window.__herthingMuse.snapshot()')
         const candidate = visibleText(current?.texts?.at(-1))
         const changed = current?.count > before.count || (candidate && candidate !== before.texts?.at(-1))
+        // Composer clearing is the page accepting submission, not a delivery/read receipt.
+        if (!notified && (current?.composerEmpty || changed)) {
+          notified = true
+          try { await onSubmitted?.() } catch (error) {
+            console.error('[earcon] submission cue failed:', error.message || error)
+          }
+        }
         if (!changed || !candidate) continue
         if (candidate !== last) {
           last = candidate
@@ -192,6 +204,6 @@ export class MuseBrowserClient {
   }
 }
 
-export async function askMuseBrowser(text) {
-  return new MuseBrowserClient().ask(text)
+export async function askMuseBrowser(text, options) {
+  return new MuseBrowserClient().ask(text, options)
 }

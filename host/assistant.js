@@ -161,7 +161,7 @@ export function assistantConfig() {
   return { provider: process.env.HERTHING_ASSISTANT_PROVIDER || 'local' }
 }
 
-export async function askAssistant(text, context = {}, { conversationId = defaultConversationId } = {}) {
+export async function askAssistant(text, context = {}, { conversationId = defaultConversationId, onSubmitted } = {}) {
   const { provider } = assistantConfig()
   const started = performance.now()
   let usedProvider = provider
@@ -170,7 +170,7 @@ export async function askAssistant(text, context = {}, { conversationId = defaul
   else if (provider === 'muse') response = await museResponse(text, context)
   else if (provider === 'muse-browser') {
     try {
-      response = await askMuseBrowser(museBrowserPrompt(text, context))
+      response = await askMuseBrowser(museBrowserPrompt(text, context), { onSubmitted })
     } catch (error) {
       if (error.code !== 'MUSE_BROWSER_UNAVAILABLE') throw error
       console.warn('[assistant:muse-browser] unavailable before submission; falling back to Meta Model API')

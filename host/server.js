@@ -11,7 +11,7 @@ import { askAssistant, assistantConfig, resetAssistantConversation } from './ass
 import { museBrowserHealth } from './muse-browser.js'
 import { cancelSpeech, speak, speechConfig } from './speech.js'
 import { extractWakeCommand, isSleepIntent } from './conversation-intents.js'
-import { playDismissalEarcon } from './earcon.js'
+import { playDismissalEarcon, playSubmissionEarcon } from './earcon.js'
 import { addEnrollmentSample, extractSpeakerEmbedding, verifySpeaker } from './speaker-verification.js'
 import { appendNote, matchNoteIntent, mentionsTasks, noteConfirmation, notesConfig, readOpenTodos } from './notes.js'
 import { createAlexaConversationHandler } from './alexa-conversation.js'
@@ -299,12 +299,19 @@ function scheduleFollowup() {
 }
 
 async function askAssistantInOrder(text, context) {
+  const generation = conversationGeneration
   const previous = assistantTurnTail
   let release
   assistantTurnTail = new Promise((resolve) => { release = resolve })
   await previous
   try {
-    return await askAssistant(text, context)
+    return await askAssistant(text, context, {
+      onSubmitted: async () => {
+        if (!conversationActive || generation !== conversationGeneration) return
+        await playSubmissionEarcon()
+        console.log('[earcon] Muse message submitted')
+      }
+    })
   } finally {
     release()
   }
