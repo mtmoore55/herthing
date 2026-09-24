@@ -77,3 +77,21 @@ describe('speech endpoint detector', () => {
     expect(detector.update({ db: -56, samples: 500 }).endpoint).toBe(true)
   })
 })
+
+test('startup quiet glitch does not turn steady fan noise into speech', () => {
+  const detector = createSpeechEndpointDetector({
+    sampleRate: 1000, startupDelayMs: 850, minimumSpeechMs: 350,
+    trailingSilenceMs: 850, speechDb: -60, silenceDb: -63,
+    adaptiveNoiseMarginDb: 4, adaptiveSilenceMarginDb: 2
+  })
+  detector.update({ db: -95, samples: 100 })
+  detector.update({ db: -56, samples: 350 })
+  detector.update({ db: -120, samples: 20 })
+  detector.update({ db: -56, samples: 380 })
+  for (let i = 0; i < 200; i++) {
+    expect(detector.update({ db: -56, samples: 100 }).speech_detected).toBe(false)
+  }
+  expect(detector.update({ db: -49, samples: 400 }).speech_detected).toBe(true)
+  expect(detector.update({ db: -56, samples: 800 }).endpoint).toBe(false)
+  expect(detector.update({ db: -56, samples: 100 }).endpoint).toBe(true)
+})

@@ -198,3 +198,12 @@ submission; it is not a server delivery receipt. The existing descending cue
 still ends a conversation. Local commands, Alexa requests, and API fallback
 requests do not play this browser submission cue. A playback failure is logged
 without discarding the answer. No sound files or new dependencies are needed.
+
+Conversation endpointing calibrates its noise floor from the duration-weighted
+median of the second half of the microphone startup window, excluding digital
+silence. This prevents a quiet startup glitch from making steady appliance noise
+hold a turn open until its 20-second safety cap. Speech detection logs include
+the calibrated floor and thresholds (dBFS). Check these with appliances running
+if submissions are delayed or answers are suppressed as apparent interruptions.
+This remains energy-based detection, so changing or speech-like noise can still
+cause false detections; room testing is needed after changing microphone placement.

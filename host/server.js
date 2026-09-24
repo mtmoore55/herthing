@@ -796,7 +796,10 @@ const server = Bun.serve({
             : endpointDetector.update(measurement)
           const hadSpeech = speechDetected
           speechDetected ||= endpoint.speech_detected
-          if (!hadSpeech && speechDetected) turnMetrics.mark('speech_started')
+          if (!hadSpeech && speechDetected) {
+            turnMetrics.mark('speech_started')
+            console.log(`[vad] speech detected; noise=${endpoint.noise_floor_db?.toFixed(1) ?? 'unknown'} dBFS, speech=${endpoint.speech_threshold_db?.toFixed(1)}, silence=${endpoint.silence_threshold_db?.toFixed(1)}`)
+          }
           if (activeMicrophoneStream === streamId && speechDetected) activeCaptureHasSpeech = true
           loudestDb = Math.max(loudestDb, measurement.db)
           peakEnergy = Math.max(peakEnergy, measurement.energy)

@@ -47,14 +47,30 @@ export function createSpeechEndpointDetector({
   let armed = voicedMs >= minimumSpeechMs
   let elapsedMs = 0
   let noiseFloorDb = Infinity
+  const calibration = []
 
   return {
     update(measurement) {
       const durationMs = measurement.samples / sampleRate * 1000
       elapsedMs += durationMs
-      if (elapsedMs < startupDelayMs) {
-        noiseFloorDb = Math.min(noiseFloorDb, measurement.db)
+      if (elapsedMs <= startupDelayMs) {
+        // Ignore the capture startup edge and digital silence. A minimum over
+        // startup samples can pin calibration to a single quiet glitch, making
+        // steady fan noise look like speech for the rest of the capture.
+        if (elapsedMs > startupDelayMs / 2 && measurement.db > -100) {
+          calibration.push({ db: measurement.db, durationMs })
+        }
         return { speech_detected: false, trailing_silence_ms: 0, endpoint: false }
+      }
+      if (calibration.length) {
+        const sorted = calibration.sort((a, b) => a.db - b.db)
+        const halfDuration = sorted.reduce((sum, frame) => sum + frame.durationMs, 0) / 2
+        let duration = 0
+        for (const frame of sorted) {
+          duration += frame.durationMs
+          if (duration >= halfDuration) { noiseFloorDb = frame.db; break }
+        }
+        calibration.length = 0
       }
       const effectiveSpeechDb = Number.isFinite(noiseFloorDb) && adaptiveNoiseMarginDb
         ? Math.max(speechDb, noiseFloorDb + adaptiveNoiseMarginDb)
