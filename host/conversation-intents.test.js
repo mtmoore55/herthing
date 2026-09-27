@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { extractWakeCommand, isSleepIntent, looksIncomplete } from './conversation-intents.js'
+import { extractKeywordWakeCommand, extractWakeCommand, isSleepIntent, looksIncomplete } from './conversation-intents.js'
 
 describe('ambient wake phrase', () => {
   test('recognizes Ziggy and extracts an optional request', () => {
@@ -38,5 +38,19 @@ describe('looksIncomplete', () => {
     expect(looksIncomplete('Turn it on.')).toBe(false)
     expect(looksIncomplete('Who is it from?')).toBe(false)
     expect(looksIncomplete('')).toBe(false)
+  })
+})
+
+describe('wake phrase variants', () => {
+  test('accepts common greetings and Whisper spellings of Ziggy', () => {
+    expect(extractWakeCommand('Hey Ziggy.')).toEqual({ command: '' })
+    expect(extractWakeCommand('Hello, Ziggie')).toEqual({ command: '' })
+    expect(extractWakeCommand('OK Siggy, what time is it?')).toEqual({ command: 'what time is it' })
+  })
+  test('a keyword-confirmed wake never forwards the mis-heard name as a request', () => {
+    expect(extractKeywordWakeCommand('Hey Diggy.')).toBe('')
+    expect(extractKeywordWakeCommand('')).toBe('')
+    expect(extractKeywordWakeCommand('Biggie, turn it up')).toBe('turn it up')
+    expect(extractKeywordWakeCommand('Hey Ziggy, what is next?')).toBe('what is next')
   })
 })

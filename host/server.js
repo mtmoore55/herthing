@@ -10,7 +10,7 @@ import { TurnMetrics } from './turn-metrics.js'
 import { askAssistant, assistantConfig, resetAssistantConversation } from './assistant.js'
 import { museBrowserHealth } from './muse-browser.js'
 import { cancelSpeech, speak, speechConfig } from './speech.js'
-import { extractWakeCommand, isSleepIntent, looksIncomplete } from './conversation-intents.js'
+import { extractKeywordWakeCommand, extractWakeCommand, isSleepIntent, looksIncomplete } from './conversation-intents.js'
 import { SpokenStream } from './spoken-stream.js'
 import { playDismissalEarcon, playSubmissionEarcon } from './earcon.js'
 import { addEnrollmentSample, extractSpeakerEmbedding, verifySpeaker } from './speaker-verification.js'
@@ -52,6 +52,7 @@ let dismissalEarconPending = false
 let speakerEnrollmentRequested = null
 let notificationTimer = null
 let activeCaptureHasSpeech = false
+let lastStreamingWakeAt = 0
 let voiceOutputActive = false
 let assistantTurnTail = Promise.resolve()
 let voiceTurnTail = Promise.resolve()
@@ -558,10 +559,18 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent, streamingFinal,
       console.log(`[stt:shadow] partial=${streamingTranscription.first_partial_ms ?? 'none'} ms; final=${streamingTranscription.elapsed_ms} ms; streaming=${JSON.stringify(streamingTranscription.text)}; batch=${JSON.stringify(batchTranscription.text)}`)
     }
     const wake = ambientStream ? extractWakeCommand(transcription.text) : null
-    const kwsCommand = wakeEvent && !wake ? transcription.text.trim().replace(/^\S+[\s,.:;!?-]*/, '') : null
+    const kwsCommand = wakeEvent && !wake ? extractKeywordWakeCommand(transcription.text) : null
     const spokenRequest = ambientStream ? (wake?.command ?? kwsCommand) : transcription.text
     if (!ambientStream || wake || wakeEvent) console.log(`[stt:${ambientStream ? 'ambient' : 'conversation'}] ${transcription.elapsed_ms} ms: ${transcription.text}`)
     else console.log(`[wake:fallback] rejected locally in ${transcription.elapsed_ms} ms`)
+
+    // The keyword spotter can finalize "Ziggy" only after the Whisper fallback
+    // has closed that capture, so one wake arrives twice. The spotter's turn,
+    // queued behind this one, owns the acknowledgement.
+    if (wake && !wake.command && !wakeEvent && Date.now() - lastStreamingWakeAt < 10000) {
+      console.log('[wake] fallback wake duplicates the streaming wake; ignored')
+      return
+    }
 
     let speakerAccepted = true
     if (spokenRequest && (!ambientStream || wake || wakeEvent)) {
@@ -581,22 +590,19 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent, streamingFinal,
       console.log(`[wake] Ziggy${spokenRequest ? `: ${spokenRequest}` : ''}`)
       if (!wakeEvent) beginConversation()
       mergeState({ transcript: spokenRequest || 'Ziggy', microphone: { mode: 'conversation', activity: spokenRequest ? 'thinking' : 'idle', user_energy: 0 } })
+      // A bare wake always answers "Yes?"; what follows is the request.
       if (!spokenRequest) {
-        if (activeMicrophoneStream && activeCaptureHasSpeech) {
-          console.log('[wake] immediate follow-up detected; acknowledgement suppressed')
-        } else {
-          voiceOutputActive = true
-          if (activeMicrophoneStream) {
-            await controlMicrophone('stop').catch((error) => console.error('[wake] acknowledgement capture stop failed:', error.message || error))
-            await Bun.sleep(80)
-          }
-          mergeState({ assistant_response: 'Yes?', microphone: { mode: 'conversation', activity: 'speaking', user_energy: 0, assistant_energy: 0.32 } })
-          try {
-            const acknowledgement = await speak('Yes?')
-            console.log(`[wake] acknowledgement first audio ${acknowledgement.first_audio_ms ?? 'unknown'} ms`)
-          } finally {
-            voiceOutputActive = false
-          }
+        voiceOutputActive = true
+        if (activeMicrophoneStream) {
+          await controlMicrophone('stop').catch((error) => console.error('[wake] acknowledgement capture stop failed:', error.message || error))
+          await Bun.sleep(80)
+        }
+        mergeState({ assistant_response: 'Yes?', microphone: { mode: 'conversation', activity: 'speaking', user_energy: 0, assistant_energy: 0.32 } })
+        try {
+          const acknowledgement = await speak('Yes?')
+          console.log(`[wake] acknowledgement first audio ${acknowledgement.first_audio_ms ?? 'unknown'} ms`)
+        } finally {
+          voiceOutputActive = false
         }
       }
     } else if (speakerAccepted && !ambientStream) {
@@ -926,6 +932,7 @@ const server = Bun.serve({
                 silenceDb: -58,
                 trailingSilenceMs: 900
               })
+              lastStreamingWakeAt = Date.now()
               beginConversation()
               mergeState({
                 transcript: 'Ziggy',

@@ -2,11 +2,23 @@ function spokenWords(value) {
   return String(value || '').toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+// Whisper spells a distant "Ziggy" several ways; all of them are the name.
+const wakeName = '(?:ziggy|ziggie|ziggi|zigi|zigy|siggy)'
+const wakeGreeting = '(?:hey|hi|hello|okay|ok|yo)'
+
 export function extractWakeCommand(value) {
-  const match = spokenWords(value).match(/^(?:(?:hey|hi|okay|ok)\s+)?ziggy(?:\s+(.*))?$/)
+  const match = spokenWords(value).match(new RegExp(`^(?:${wakeGreeting}\\s+)?${wakeName}(?:\\s+(.*))?$`))
   if (!match) return null
-  const command = (match[1] || '').replace(/^(?:ziggy\s*)+/, '').trim()
+  const command = (match[1] || '').replace(new RegExp(`^(?:${wakeName}\\s*)+`), '').trim()
   return { command }
+}
+
+// The keyword spotter already confirmed the wake word, so an unrecognised
+// spelling of the name ("Hey Diggy") is still the name, never the request.
+export function extractKeywordWakeCommand(value) {
+  const wake = extractWakeCommand(value)
+  if (wake) return wake.command
+  return spokenWords(value).replace(new RegExp(`^(?:${wakeGreeting}\\s+)?\\S+\\s*`), '').trim()
 }
 
 export function isSleepIntent(value) {
