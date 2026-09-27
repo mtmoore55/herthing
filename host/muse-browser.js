@@ -8,12 +8,19 @@ function visibleText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
 
+// The chat renders the submitted message with its own whitespace and may
+// clip or reflow its start; the final words are the most distinctive part.
+export function submissionNeedle(text) {
+  return visibleText(text).slice(-48)
+}
+
 export function museBrowserConfig() {
   return {
     debugUrl: process.env.HERTHING_MUSE_BROWSER_DEBUG_URL || defaultDebugUrl,
     chatUrl: process.env.HERTHING_MUSE_BROWSER_CHAT_URL || null,
     timeoutMs: Number(process.env.HERTHING_MUSE_BROWSER_TIMEOUT_MS || 90000),
-    settleMs: Number(process.env.HERTHING_MUSE_BROWSER_SETTLE_MS || 450)
+    settleMs: Number(process.env.HERTHING_MUSE_BROWSER_SETTLE_MS || 450),
+    stallMs: Number(process.env.HERTHING_MUSE_BROWSER_STALL_MS || 2500)
   }
 }
 
@@ -107,17 +114,37 @@ const pageHelpers = String.raw`
   };
   const composer = () => [...document.querySelectorAll('textarea, [contenteditable="true"]')].find(visible);
   const text = (element) => (element?.innerText || element?.textContent || '').replace(/\s+/g, ' ').trim();
-  const candidates = () => [...document.querySelectorAll('[data-message-author-role="assistant"], [data-testid*="assistant"], [class*="group/msg"][class*="justify-start"]')]
-    .filter(visible)
-    .map((element) => ({ element, text: text(element) }))
-    .filter((entry) => entry.text);
+  const userMessages = () => [...document.querySelectorAll('[data-message-author-role="user"], [class*="group/msg"][class*="items-end"]')]
+    .filter(visible);
+  const assistantMessages = () => [...document.querySelectorAll('[data-message-author-role="assistant"], [data-testid*="assistant"], [class*="group/msg"][class*="justify-start"]')]
+    .filter(visible);
+  const follows = (element, anchor) => Boolean(anchor.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+  // Prefer the rendered markdown body: it excludes reaction/copy controls and
+  // any tool-status chrome, and exposes whether the reply is still streaming.
+  const replyText = (element) => {
+    const bodies = [...element.querySelectorAll('[data-hatch-markdown-streaming]')];
+    return bodies.length ? bodies.map(text).filter(Boolean).join(' ') : text(element);
+  };
+  const streaming = (element) => Boolean(element.querySelector('[data-hatch-markdown-streaming="true"]'));
   window.__herthingMuse = {
     composer,
-    snapshot() {
-      const entries = candidates();
+    // needle is the tail of the text HerThing just submitted. Only assistant
+    // bubbles after the user bubble containing it count as the reply, so a
+    // lazily loaded or re-rendered history can never be mistaken for one.
+    snapshot(needle = '') {
       const input = composer();
       const composerEmpty = input ? !(input.value ?? input.textContent ?? '').trim() : false;
-      return { ready: Boolean(input), composerEmpty, count: entries.length, texts: entries.map((entry) => entry.text) };
+      const users = userMessages();
+      const anchor = needle ? [...users].reverse().find((element) => text(element).includes(needle)) : null;
+      const replies = anchor ? assistantMessages().filter((element) => follows(element, anchor)) : [];
+      return {
+        ready: Boolean(input),
+        composerEmpty,
+        user_count: users.length,
+        anchored: Boolean(anchor),
+        reply: replies.map(replyText).filter(Boolean).join(' '),
+        streaming: replies.some(streaming)
+      };
     },
     focusComposer() {
       const element = composer();
@@ -149,7 +176,7 @@ export class MuseBrowserClient {
     return response.json()
   }
 
-  async ask(text, { onSubmitted } = {}) {
+  async ask(text, { onSubmitted, onPartial } = {}) {
     let submitted = false
     let cdp = null
     try {
@@ -171,28 +198,42 @@ export class MuseBrowserClient {
       await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
       let notified = false
 
+      const needle = submissionNeedle(text)
       const deadline = Date.now() + this.config.timeoutMs
-      let last = before.texts?.at(-1) || ''
+      let last = ''
       let stableSince = 0
       while (Date.now() < deadline) {
         await sleep(150)
-        const current = await cdp.evaluate('window.__herthingMuse.snapshot()')
-        const candidate = visibleText(current?.texts?.at(-1))
-        const changed = current?.count > before.count || (candidate && candidate !== before.texts?.at(-1))
+        const current = await cdp.evaluate(`window.__herthingMuse.snapshot(${JSON.stringify(needle)})`)
+        const candidate = visibleText(current?.reply)
         // Composer clearing is the page accepting submission, not a delivery/read receipt.
-        if (!notified && (current?.composerEmpty || changed)) {
+        if (!notified && (current?.composerEmpty || current?.anchored)) {
           notified = true
           try { await onSubmitted?.() } catch (error) {
             console.error('[earcon] submission cue failed:', error.message || error)
           }
         }
-        if (!changed || !candidate) continue
+        if (!current?.anchored || !candidate) continue
         if (candidate !== last) {
           last = candidate
           stableSince = Date.now()
+          try { onPartial?.(candidate, { streaming: Boolean(current.streaming) }) } catch (error) {
+            console.error('[assistant:muse-browser] partial handler failed:', error.message || error)
+          }
           continue
         }
-        if (stableSince && Date.now() - stableSince >= this.config.settleMs) return candidate
+        const stableMs = Date.now() - stableSince
+        if (!current.streaming && stableMs >= this.config.settleMs) return candidate
+        // The page can leave a finished reply flagged as streaming. Text that
+        // has not changed for this long is treated as complete regardless.
+        if (stableMs >= this.config.stallMs) {
+          console.warn(`[assistant:muse-browser] reply still flagged as streaming after ${stableMs} ms unchanged; treating as complete`)
+          return candidate
+        }
+      }
+      if (last) {
+        console.warn('[assistant:muse-browser] timed out before the reply settled; using the text received so far')
+        return last
       }
       throw new Error('Timed out waiting for Muse to finish responding')
     } catch (error) {

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { MuseBrowserClient } from './muse-browser.js'
 
-function fixture({ accepted = true, ready = true, dispatchFails = false } = {}) {
+function fixture({ accepted = true, ready = true, dispatchFails = false, frames = null, stallMs = 1000 } = {}) {
   let polls = 0
   const session = {
     async connect() {}, close() {},
@@ -10,12 +10,13 @@ function fixture({ accepted = true, ready = true, dispatchFails = false } = {}) 
     },
     async evaluate(expression) {
       if (expression === 'window.__herthingMuse.focusComposer()') return true
-      if (expression.startsWith('\n')) return { ready, count: 0, texts: [] }
+      if (expression.startsWith('\n')) return { ready }
       polls++
-      return { composerEmpty: accepted, count: accepted && polls > 1 ? 1 : 0, texts: accepted && polls > 1 ? ['Answer'] : [] }
+      if (frames) return frames[Math.min(polls - 1, frames.length - 1)]
+      return { composerEmpty: accepted, anchored: accepted && polls > 1, reply: accepted && polls > 1 ? 'Answer' : '', streaming: false }
     }
   }
-  const client = new MuseBrowserClient({ timeoutMs: accepted ? 2000 : 200, settleMs: 0 }, () => session)
+  const client = new MuseBrowserClient({ timeoutMs: accepted ? 2000 : 200, settleMs: 0, stallMs }, () => session)
   client.targets = async () => [{ type: 'page', url: 'https://muse.ai/', webSocketDebuggerUrl: 'fake' }]
   return { client, polls: () => polls }
 }
@@ -55,4 +56,33 @@ test('ambiguous Enter failure does not cause duplicate fallback or chime', async
 test('audio playback failure does not lose the assistant response', async () => {
   const { client } = fixture()
   expect(await client.ask('Hello', { onSubmitted: () => { throw new Error('test audio unavailable') } })).toBe('Answer')
+})
+
+test('an earlier reply is never returned before this message is anchored', async () => {
+  const { client } = fixture({ frames: [
+    { composerEmpty: true, anchored: false, reply: "It's twelve-oh-one.", streaming: false },
+    { composerEmpty: true, anchored: false, reply: "It's twelve-oh-one.", streaming: false },
+    { composerEmpty: true, anchored: true, reply: '', streaming: false },
+    { composerEmpty: true, anchored: true, reply: 'Deep violet.', streaming: false }
+  ] })
+  expect(await client.ask('What is your favorite color?')).toBe('Deep violet.')
+})
+
+test('waits for streaming to finish and reports partial text', async () => {
+  const partials = []
+  const { client } = fixture({ frames: [
+    { composerEmpty: true, anchored: true, reply: 'First.', streaming: true },
+    { composerEmpty: true, anchored: true, reply: 'First.', streaming: true },
+    { composerEmpty: true, anchored: true, reply: 'First. Second.', streaming: true },
+    { composerEmpty: true, anchored: true, reply: 'First. Second.', streaming: false }
+  ] })
+  expect(await client.ask('Hello', { onPartial: (text, { streaming }) => partials.push([text, streaming]) })).toBe('First. Second.')
+  expect(partials).toEqual([['First.', true], ['First. Second.', true]])
+})
+
+test('a reply left flagged as streaming is returned once its text stops changing', async () => {
+  const { client } = fixture({ stallMs: 300, frames: [
+    { composerEmpty: true, anchored: true, reply: 'Pad krapow is a stir-fry. Spicy and fast.', streaming: true }
+  ] })
+  expect(await client.ask('What is pad krapow?')).toBe('Pad krapow is a stir-fry. Spicy and fast.')
 })
