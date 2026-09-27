@@ -16,6 +16,7 @@ import { playDismissalEarcon, playSubmissionEarcon } from './earcon.js'
 import { addEnrollmentSample, extractSpeakerEmbedding, verifySpeaker } from './speaker-verification.js'
 import { appendNote, matchNoteIntent, mentionsTasks, noteConfirmation, notesConfig, readOpenTodos } from './notes.js'
 import { createAlexaConversationHandler } from './alexa-conversation.js'
+import { ClaudeJobs, claudeJobsConfig, matchClaudeIntent } from './claude-jobs.js'
 
 const protocol = 'herthing/1'
 const bindHost = process.env.HERTHING_HOST || '172.16.42.1'
@@ -328,6 +329,10 @@ async function askAssistantInOrder(text, context, { onPartial } = {}) {
 // the relay would add a round trip to the one kind of turn whose whole value
 // is being immediate, and would fail whenever the relay or the network does.
 async function resolveVoiceResponse(spokenRequest, rawTranscript, conversationId, hooks = {}) {
+  // Only local voice turns reach Claude; the Alexa gateway passes a
+  // conversationId and never sets speakerVerified.
+  const claudeIntent = !conversationId && claudeJobs ? matchClaudeIntent(rawTranscript) || matchClaudeIntent(spokenRequest) : null
+  if (claudeIntent) return { provider: 'claude', text: handleClaudeIntent(claudeIntent, hooks.speakerVerified), elapsed_ms: 0 }
   if (configuredNotes) {
     // Prefer the untouched transcript. Ambient wake extraction lowercases and
     // strips punctuation, and a saved note should read the way it was spoken.
@@ -351,6 +356,61 @@ async function resolveVoiceResponse(spokenRequest, rawTranscript, conversationId
     : state
   if (conversationId) return askAssistant(spokenRequest, context, { conversationId })
   return askAssistantInOrder(spokenRequest, context, hooks)
+}
+
+// Voice requests that hand work on this computer to Claude Code. A job can
+// change this machine, so it requires a verified voice match, not merely a
+// turn that speaker verification did not reject.
+const claudeJobs = claudeJobsConfig().enabled
+  ? new ClaudeJobs(claudeJobsConfig(), { onFinished: announceClaudeJob })
+  : null
+
+function handleClaudeIntent(intent, speakerVerified) {
+  if (intent.kind === 'status') return claudeJobs.statusText()
+  if (!speakerVerified) {
+    console.log('[claude] refused: speaker not verified')
+    return 'I can only hand work to Claude when I recognise your voice.'
+  }
+  if (claudeJobs.active) return "Claude is still working on the last thing. I'll tell you when it's done."
+  const followup = intent.kind === 'followup' && claudeJobs.canContinue()
+  const job = claudeJobs.start(intent.task, { followup })
+  console.log(`[claude] job ${job.id} started${job.followup ? ` (continuing ${job.resumed_session})` : ''}: ${intent.task}`)
+  publishNotification('claude', 'CLAUDE IS ON IT', 4000)
+  job.done.catch((error) => console.error('[claude] job failed:', error.message || error))
+  return followup
+    ? "Okay, I've passed that on to Claude."
+    : "Okay, I've asked Claude to look into that. I'll let you know what it finds."
+}
+
+async function announceClaudeJob(job) {
+  console.log(`[claude] job ${job.id} ${job.ok ? 'finished' : `failed (${job.error})`}; report ${job.report_file}`)
+  const summary = job.spoken || (job.ok ? 'Claude finished.' : 'Claude stopped before it could finish.')
+  Bun.spawn(['notify-send', '--app-name=HerThing', 'Claude finished', `${summary}\n${job.report_file}`], { stdout: 'ignore', stderr: 'ignore' })
+  publishNotification('claude', job.ok ? 'CLAUDE FINISHED' : 'CLAUDE STOPPED', 6000)
+  // Wait for a quiet moment: never talk over a reply or over the user.
+  const deadline = Date.now() + 10 * 60 * 1000
+  while (voiceOutputActive || (activeMicrophoneStream && activeCaptureHasSpeech) || pendingVoiceTurns > 0) {
+    if (Date.now() > deadline) return
+    await Bun.sleep(1000)
+  }
+  voiceOutputActive = true
+  try {
+    clearTimeout(followupTimer)
+    clearTimeout(ambientTimer)
+    if (activeMicrophoneStream) {
+      await controlMicrophone('stop').catch((error) => console.error('[claude] capture stop failed:', error.message || error))
+      await Bun.sleep(80)
+    }
+    await playSubmissionEarcon().catch(() => {})
+    mergeState({ assistant_response: summary })
+    await speak(`Claude here. ${summary}`)
+  } catch (error) {
+    console.error('[claude] announcement failed:', error.message || error)
+  } finally {
+    voiceOutputActive = false
+    if (conversationActive) scheduleFollowup()
+    else if (microphoneEnabled) scheduleAmbient()
+  }
 }
 
 const alexaConversationHandler = createAlexaConversationHandler({
@@ -377,9 +437,9 @@ function enqueueVoiceTurn(task) {
 // A turn whose transcript stops mid-sentence ("Can you have the") is usually a
 // pause for thought. Hold it briefly; the next conversation turn is appended
 // to it, and only if none arrives is the fragment sent on its own.
-function holdFragment(text, raw) {
+function holdFragment(text, raw, verified) {
   clearTimeout(heldFragment?.timer)
-  const fragment = { text, raw, generation: conversationGeneration }
+  const fragment = { text, raw, verified, generation: conversationGeneration }
   const flush = () => {
     if (heldFragment !== fragment) return
     // Speech in progress or a queued turn will absorb the fragment itself.
@@ -392,7 +452,7 @@ function holdFragment(text, raw) {
     console.log('[fragment] no continuation; sending as spoken')
     enqueueVoiceTurn(async () => {
       try {
-        await respondToRequest(fragment.text, fragment.raw, null)
+        await respondToRequest(fragment.text, fragment.raw, null, { speakerVerified: fragment.verified })
       } finally {
         if (conversationActive && !activeMicrophoneStream && !voiceOutputActive) scheduleFollowup()
       }
@@ -511,13 +571,13 @@ function createResponseVoice(metrics) {
   }
 }
 
-async function respondToRequest(spokenRequest, rawTranscript, metrics) {
+async function respondToRequest(spokenRequest, rawTranscript, metrics, { speakerVerified = false } = {}) {
   extendConversation()
   metrics?.mark('assistant_started')
   const voice = createResponseVoice(metrics)
   let assistant
   try {
-    assistant = await resolveVoiceResponse(spokenRequest, rawTranscript, null, { onPartial: (text) => voice.partial(text) })
+    assistant = await resolveVoiceResponse(spokenRequest, rawTranscript, null, { onPartial: (text) => voice.partial(text), speakerVerified })
   } catch (error) {
     await voice.abandon()
     throw error
@@ -573,6 +633,7 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent, streamingFinal,
     }
 
     let speakerAccepted = true
+    let speakerVerified = false
     if (spokenRequest && (!ambientStream || wake || wakeEvent)) {
       metrics?.mark('speaker_started')
       const verification = await verifySpeaker(pcm)
@@ -580,6 +641,7 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent, streamingFinal,
       if (verification.enabled) {
         console.log(`[speaker] ${verification.match ? 'accepted' : 'ignored'} ${verification.name}; score=${verification.score?.toFixed(3)} threshold=${verification.threshold}`)
         speakerAccepted = verification.match
+        speakerVerified = verification.match
         if (!speakerAccepted) {
           publishNotification('voice_ignored', 'OTHER VOICE IGNORED')
           if (ambientStream && conversationActive) endConversation()
@@ -617,8 +679,9 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent, streamingFinal,
       const request = fragment ? `${fragment.text} ${spokenRequest}` : spokenRequest
       const raw = fragment ? `${fragment.raw} ${transcription.text}` : transcription.text
       if (fragment) console.log(`[fragment] joined continuation: ${request}`)
-      if (looksIncomplete(request)) holdFragment(request, raw)
-      else await respondToRequest(request, raw, metrics)
+      const verified = fragment ? fragment.verified && speakerVerified : speakerVerified
+      if (looksIncomplete(request)) holdFragment(request, raw, verified)
+      else await respondToRequest(request, raw, metrics, { speakerVerified: verified })
     }
   } catch (error) {
     console.error('[voice] turn failed:', error.message || error)

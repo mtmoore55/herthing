@@ -21,6 +21,9 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=%h/.config/herthing
+# Voice-started Claude Code job records. The jobs themselves run as separate
+# transient units outside this sandbox.
+ReadWritePaths=-%h/.local/share/herthing/claude-jobs
 
 [Install]
 WantedBy=default.target
