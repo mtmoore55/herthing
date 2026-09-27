@@ -10,7 +10,8 @@ import { TurnMetrics } from './turn-metrics.js'
 import { askAssistant, assistantConfig, resetAssistantConversation } from './assistant.js'
 import { museBrowserHealth } from './muse-browser.js'
 import { cancelSpeech, speak, speechConfig } from './speech.js'
-import { extractWakeCommand, isSleepIntent } from './conversation-intents.js'
+import { extractWakeCommand, isSleepIntent, looksIncomplete } from './conversation-intents.js'
+import { SpokenStream } from './spoken-stream.js'
 import { playDismissalEarcon, playSubmissionEarcon } from './earcon.js'
 import { addEnrollmentSample, extractSpeakerEmbedding, verifySpeaker } from './speaker-verification.js'
 import { appendNote, matchNoteIntent, mentionsTasks, noteConfirmation, notesConfig, readOpenTodos } from './notes.js'
@@ -35,6 +36,10 @@ const conversationCaptureMaxMs = Number(process.env.HERTHING_CONVERSATION_CAPTUR
 // concurrency and cooldown below prevent it from becoming an STT backlog.
 const ambientFallbackMaxMs = Number(process.env.HERTHING_AMBIENT_FALLBACK_MAX_MS || 15000)
 const ambientFallbackCooldownMs = Number(process.env.HERTHING_AMBIENT_FALLBACK_COOLDOWN_MS || 8000)
+const fragmentHoldMs = Number(process.env.HERTHING_FRAGMENT_HOLD_MS || 2500)
+const fillerDelayMs = Number(process.env.HERTHING_FILLER_DELAY_MS || 4500)
+const fillerPhrases = ['One sec.', 'Just a moment.', 'Working on it.']
+let heldFragment = null
 let conversationActive = false
 let conversationExpiresAt = 0
 let conversationGeneration = 0
@@ -298,7 +303,7 @@ function scheduleFollowup() {
   }, followupDelayMs)
 }
 
-async function askAssistantInOrder(text, context) {
+async function askAssistantInOrder(text, context, { onPartial } = {}) {
   const generation = conversationGeneration
   const previous = assistantTurnTail
   let release
@@ -306,6 +311,7 @@ async function askAssistantInOrder(text, context) {
   await previous
   try {
     return await askAssistant(text, context, {
+      onPartial,
       onSubmitted: async () => {
         if (!conversationActive || generation !== conversationGeneration) return
         await playSubmissionEarcon()
@@ -320,7 +326,7 @@ async function askAssistantInOrder(text, context) {
 // Capture is answered from the vault, not the assistant. Routing it through
 // the relay would add a round trip to the one kind of turn whose whole value
 // is being immediate, and would fail whenever the relay or the network does.
-async function resolveVoiceResponse(spokenRequest, rawTranscript, conversationId) {
+async function resolveVoiceResponse(spokenRequest, rawTranscript, conversationId, hooks = {}) {
   if (configuredNotes) {
     // Prefer the untouched transcript. Ambient wake extraction lowercases and
     // strips punctuation, and a saved note should read the way it was spoken.
@@ -343,7 +349,7 @@ async function resolveVoiceResponse(spokenRequest, rawTranscript, conversationId
     ? { ...state, todos: await readOpenTodos(configuredNotes).catch(() => []) }
     : state
   if (conversationId) return askAssistant(spokenRequest, context, { conversationId })
-  return askAssistantInOrder(spokenRequest, context)
+  return askAssistantInOrder(spokenRequest, context, hooks)
 }
 
 const alexaConversationHandler = createAlexaConversationHandler({
@@ -365,6 +371,164 @@ function enqueueVoiceTurn(task) {
   const run = voiceTurnTail.then(trackedTask, trackedTask)
   voiceTurnTail = run.catch(() => {})
   return run
+}
+
+// A turn whose transcript stops mid-sentence ("Can you have the") is usually a
+// pause for thought. Hold it briefly; the next conversation turn is appended
+// to it, and only if none arrives is the fragment sent on its own.
+function holdFragment(text, raw) {
+  clearTimeout(heldFragment?.timer)
+  const fragment = { text, raw, generation: conversationGeneration }
+  const flush = () => {
+    if (heldFragment !== fragment) return
+    // Speech in progress or a queued turn will absorb the fragment itself.
+    if ((activeMicrophoneStream && activeCaptureHasSpeech) || pendingVoiceTurns > 0) {
+      fragment.timer = setTimeout(flush, 500)
+      return
+    }
+    heldFragment = null
+    if (!conversationActive || fragment.generation !== conversationGeneration) return
+    console.log('[fragment] no continuation; sending as spoken')
+    enqueueVoiceTurn(async () => {
+      try {
+        await respondToRequest(fragment.text, fragment.raw, null)
+      } finally {
+        if (conversationActive && !activeMicrophoneStream && !voiceOutputActive) scheduleFollowup()
+      }
+    }).catch((error) => console.error('[fragment] turn failed:', error.message || error))
+  }
+  fragment.timer = setTimeout(flush, fragmentHoldMs)
+  heldFragment = fragment
+  console.log(`[fragment] holding for continuation: ${text}`)
+  mergeState({ transcript: text })
+}
+
+function takeHeldFragment() {
+  const fragment = heldFragment
+  if (!fragment) return null
+  clearTimeout(fragment.timer)
+  heldFragment = null
+  return fragment.generation === conversationGeneration ? fragment : null
+}
+
+// Speaks an assistant reply sentence by sentence while it is still being
+// written, with a short spoken filler if nothing has arrived after a pause.
+function createResponseVoice(metrics) {
+  const generation = conversationGeneration
+  const stream = new SpokenStream()
+  let chain = Promise.resolve()
+  let outputOpen = false
+  let abandoned = false
+  let firstSpeech = null
+  let spokenText = ''
+  const current = () => conversationActive && generation === conversationGeneration
+  const userIsSpeaking = () => Boolean(activeMicrophoneStream && activeCaptureHasSpeech)
+
+  async function openOutput() {
+    if (outputOpen) return
+    outputOpen = true
+    voiceOutputActive = true
+    clearTimeout(followupTimer)
+    if (activeMicrophoneStream) {
+      await controlMicrophone('stop').catch((error) => console.error('[barge-in] pre-speech capture stop failed:', error.message || error))
+      await Bun.sleep(80)
+    }
+  }
+
+  function closeOutput() {
+    if (!outputOpen) return
+    outputOpen = false
+    voiceOutputActive = false
+  }
+
+  function enqueue(task) {
+    chain = chain.then(task).catch((error) => {
+      abandoned = true
+      console.error('[tts] response speech failed:', error.message || error)
+    })
+  }
+
+  async function say(sentence) {
+    if (abandoned || !current()) {
+      abandoned = true
+      return
+    }
+    if (!outputOpen && userIsSpeaking()) {
+      abandoned = true
+      console.log('[barge-in] continuation detected while thinking; suppressing stale spoken response')
+      mergeState({ assistant_response: null, microphone: { mode: 'conversation', activity: 'listening', user_energy: 0, assistant_energy: 0 } })
+      return
+    }
+    await openOutput()
+    spokenText = spokenText ? `${spokenText} ${sentence}` : sentence
+    mergeState({ assistant_response: spokenText, microphone: { mode: 'conversation', activity: 'speaking', user_energy: 0, assistant_energy: 0.45 } })
+    if (!firstSpeech) metrics?.mark('tts_started')
+    const speech = await speak(sentence)
+    if (!firstSpeech) {
+      firstSpeech = speech
+      metrics?.markAfter('tts_first_audio', 'tts_started', speech.first_audio_ms)
+    }
+    if (speech.cancelled) abandoned = true
+  }
+
+  const fillerTimer = setTimeout(() => enqueue(async () => {
+    if (stream.started || abandoned || !current() || userIsSpeaking()) return
+    await openOutput()
+    mergeState({ microphone: { mode: 'conversation', activity: 'speaking', user_energy: 0, assistant_energy: 0.25 } })
+    const phrase = fillerPhrases[Math.floor(Math.random() * fillerPhrases.length)]
+    const speech = await speak(phrase)
+    console.log(`[filler] "${phrase}" after ${fillerDelayMs} ms${speech.cancelled ? ' (cancelled)' : ''}`)
+    closeOutput()
+    if (!current()) return
+    // Keep listening while the reply is still pending so a continuation or
+    // correction can still interrupt it.
+    mergeState({ microphone: { mode: 'conversation', activity: 'thinking', user_energy: 0 } })
+    scheduleFollowup()
+  }), fillerDelayMs)
+
+  return {
+    partial(text) {
+      if (abandoned) return
+      for (const sentence of stream.update(text)) enqueue(() => say(sentence))
+    },
+    async finish(text) {
+      clearTimeout(fillerTimer)
+      if (!abandoned) for (const sentence of stream.finish(text)) enqueue(() => say(sentence))
+      await chain
+      closeOutput()
+      if (firstSpeech) {
+        metrics?.mark('tts_finished')
+        console.log(`[tts] first audio ${firstSpeech.first_audio_ms ?? 'unknown'} ms${firstSpeech.skipped ? ' (disabled)' : ''}${abandoned ? ' (interrupted)' : ''}`)
+      }
+    },
+    async abandon() {
+      clearTimeout(fillerTimer)
+      abandoned = true
+      await chain
+      closeOutput()
+    }
+  }
+}
+
+async function respondToRequest(spokenRequest, rawTranscript, metrics) {
+  extendConversation()
+  metrics?.mark('assistant_started')
+  const voice = createResponseVoice(metrics)
+  let assistant
+  try {
+    assistant = await resolveVoiceResponse(spokenRequest, rawTranscript, null, { onPartial: (text) => voice.partial(text) })
+  } catch (error) {
+    await voice.abandon()
+    throw error
+  }
+  metrics?.mark('assistant_finished')
+  if (!conversationActive) {
+    await voice.abandon()
+    console.log('[conversation] response discarded after session ended')
+    return
+  }
+  console.log(`[assistant:${assistant.provider}] ${assistant.elapsed_ms} ms: ${assistant.text}`)
+  await voice.finish(assistant.text)
 }
 
 async function processVoiceTurn({ pcm, ambientStream, wakeEvent, streamingFinal, metrics }) {
@@ -443,32 +607,12 @@ async function processVoiceTurn({ pcm, ambientStream, wakeEvent, streamingFinal,
       console.log(`[conversation] sleep intent: ${transcription.text}`)
       endConversation({ earcon: true })
     } else if (spokenRequest) {
-      extendConversation()
-      metrics?.mark('assistant_started')
-      const assistant = await resolveVoiceResponse(spokenRequest, transcription.text)
-      metrics?.mark('assistant_finished')
-      if (conversationActive) {
-        console.log(`[assistant:${assistant.provider}] ${assistant.elapsed_ms} ms: ${assistant.text}`)
-        if (activeMicrophoneStream && activeCaptureHasSpeech) {
-          console.log('[barge-in] continuation detected while thinking; suppressing stale spoken response')
-          mergeState({ assistant_response: null, microphone: { mode: 'conversation', activity: 'listening', user_energy: 0, assistant_energy: 0 } })
-        } else {
-          voiceOutputActive = true
-          if (activeMicrophoneStream) {
-            await controlMicrophone('stop').catch((error) => console.error('[barge-in] pre-speech capture stop failed:', error.message || error))
-            await Bun.sleep(80)
-          }
-          mergeState({ assistant_response: assistant.text, microphone: { mode: 'conversation', activity: 'speaking', user_energy: 0, assistant_energy: 0.45 } })
-          try {
-            metrics?.mark('tts_started')
-            const speech = await speak(assistant.text)
-            metrics?.markAfter('tts_first_audio', 'tts_started', speech.first_audio_ms).mark('tts_finished')
-            console.log(`[tts] first audio ${speech.first_audio_ms ?? 'unknown'} ms; complete ${speech.elapsed_ms} ms${speech.skipped ? ' (disabled)' : speech.cancelled ? ' (cancelled)' : ''}`)
-          } finally {
-            voiceOutputActive = false
-          }
-        }
-      } else console.log('[conversation] response discarded after session ended')
+      const fragment = ambientStream ? null : takeHeldFragment()
+      const request = fragment ? `${fragment.text} ${spokenRequest}` : spokenRequest
+      const raw = fragment ? `${fragment.raw} ${transcription.text}` : transcription.text
+      if (fragment) console.log(`[fragment] joined continuation: ${request}`)
+      if (looksIncomplete(request)) holdFragment(request, raw)
+      else await respondToRequest(request, raw, metrics)
     }
   } catch (error) {
     console.error('[voice] turn failed:', error.message || error)

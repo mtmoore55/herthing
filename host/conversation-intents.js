@@ -24,3 +24,19 @@ export function isSleepIntent(value) {
     new RegExp(`^(?:${farewell}|${thanks})(?:\\s+(?:${farewell}|${thanks}))*$`).test(words) ||
     /^(?:go\s+to\s+sleep)(?:\s+ziggy)?$/.test(words)
 }
+
+// Words that almost never end a finished spoken request. A transcript ending
+// in one is usually a mid-sentence pause ("Can you have the …"), so the turn
+// is held briefly for its continuation instead of being sent on its own.
+const danglingWords = new Set([
+  'the', 'a', 'an', 'to', 'and', 'or', 'but', 'of', 'for', 'with', 'my', 'your',
+  'our', 'their', 'his', 'her', 'if', 'because', 'from', 'into', 'about', 'than',
+  'whether', 'um', 'uh', 'er', 'erm', 'hmm'
+])
+
+export function looksIncomplete(value) {
+  const text = String(value || '').trim()
+  if (!text || /\?["')\]]*$/.test(text)) return false
+  if (/(?:\.\.\.|…|[-–—])$/.test(text)) return true
+  return danglingWords.has(spokenWords(text).split(' ').at(-1))
+}

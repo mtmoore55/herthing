@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { extractWakeCommand, isSleepIntent } from './conversation-intents.js'
+import { extractWakeCommand, isSleepIntent, looksIncomplete } from './conversation-intents.js'
 
 describe('ambient wake phrase', () => {
   test('recognizes Ziggy and extracts an optional request', () => {
@@ -22,5 +22,21 @@ describe('conversation sleep intent', () => {
     expect(isSleepIntent('Okay thank you, but what is next?')).toBe(false)
     expect(isSleepIntent('Tell Andy thank you')).toBe(false)
     expect(isSleepIntent("Tell me when we're done")).toBe(false)
+  })
+})
+
+describe('looksIncomplete', () => {
+  test('holds transcripts that stop mid-sentence', () => {
+    expect(looksIncomplete('Can you have the')).toBe(true)
+    expect(looksIncomplete('Can you have the.')).toBe(true)
+    expect(looksIncomplete('Add eggs and')).toBe(true)
+    expect(looksIncomplete('I was wondering…')).toBe(true)
+  })
+
+  test('sends finished requests immediately', () => {
+    expect(looksIncomplete('Can you play some music in here?')).toBe(false)
+    expect(looksIncomplete('Turn it on.')).toBe(false)
+    expect(looksIncomplete('Who is it from?')).toBe(false)
+    expect(looksIncomplete('')).toBe(false)
   })
 })
