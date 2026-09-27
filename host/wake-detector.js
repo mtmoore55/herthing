@@ -28,7 +28,10 @@ export function wakeDetectorConfig(env = process.env) {
     joiner: env.HERTHING_KWS_JOINER || `${model}/joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx`,
     tokens: env.HERTHING_KWS_TOKENS || `${model}/tokens.txt`,
     keywords: env.HERTHING_KWS_KEYWORDS || `${import.meta.dir}/keywords/ziggy.txt`,
-    threshold: Number(env.HERTHING_KWS_THRESHOLD || 0.25)
+    threshold: Number(env.HERTHING_KWS_THRESHOLD || 0.25),
+    // Long-running keyword streams stop detecting in room tone; the runtime
+    // resets two staggered streams on this interval (0 disables).
+    resetSeconds: Number(env.HERTHING_KWS_RESET_SECONDS ?? 20)
   }
 }
 
@@ -51,7 +54,7 @@ export class WakeDetector {
     const config = this.config
     this.process = this.spawn([
       config.runtime, config.encoder, config.decoder, config.joiner,
-      config.tokens, config.keywords, String(config.threshold)
+      config.tokens, config.keywords, String(config.threshold), String(config.resetSeconds ?? 20)
     ], { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' })
     this.readOutput()
     this.readErrors()
