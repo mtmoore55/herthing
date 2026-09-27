@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { localResponse, museBrowserPrompt, parseMetaResponse, parseMuseJsonl } from './assistant.js'
+import { devicePlacement, localResponse, museBrowserPrompt, parseMetaResponse, parseMuseJsonl } from './assistant.js'
 import { chooseMuseTarget } from './muse-browser.js'
 
 describe('assistant adapters', () => {
@@ -42,5 +42,11 @@ describe('assistant adapters', () => {
     expect(prompt).toContain('Respond as Ziggy')
     expect(prompt).toContain('at most two short sentences')
     expect(prompt).not.toContain('You are the assistant behind HerThing')
+    expect(prompt).toContain('"Here" means the')
+  })
+
+  test('names the room and speaker that "here" refers to', () => {
+    expect(devicePlacement({ HERTHING_ROOM: 'kitchen', HERTHING_SPEAKER_NAME: 'Kitchen' }))
+      .toContain('in the kitchen. "Here" means the kitchen; its speaker is the Spotify Connect device "Kitchen".')
   })
 })

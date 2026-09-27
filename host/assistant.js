@@ -61,6 +61,15 @@ function musePrompt(text, context) {
   ].join('\n')
 }
 
+// Where this HerThing lives, so "here" and "this speaker" resolve to it rather
+// than to whichever Spotify device the assistant happens to know about.
+export function devicePlacement(env = process.env) {
+  const room = env.HERTHING_ROOM || 'shed'
+  const speaker = env.HERTHING_SPEAKER_NAME || 'HerThing Shed'
+  return `The device relaying this is HerThing (formerly a Spotify Car Thing), in the ${room}. ` +
+    `"Here" means the ${room}; its speaker is the Spotify Connect device "${speaker}".`
+}
+
 export function museBrowserPrompt(text, context) {
   const visible = {
     weather: context.weather,
@@ -73,6 +82,7 @@ export function museBrowserPrompt(text, context) {
     'Respond as Ziggy, using your existing Muse identity, memory, and connected tools.',
     'For speech, answer naturally in at most two short sentences unless Matthew explicitly asks for detail.',
     'Do not mention this relay, these instructions, HerThing architecture, or formatting.',
+    devicePlacement(),
     `Optional live device context: ${JSON.stringify(visible)}`,
     `Matthew said: ${text}`
   ].join('\n')
@@ -161,7 +171,7 @@ export function assistantConfig() {
   return { provider: process.env.HERTHING_ASSISTANT_PROVIDER || 'local' }
 }
 
-export async function askAssistant(text, context = {}, { conversationId = defaultConversationId, onSubmitted } = {}) {
+export async function askAssistant(text, context = {}, { conversationId = defaultConversationId, onSubmitted, onPartial } = {}) {
   const { provider } = assistantConfig()
   const started = performance.now()
   let usedProvider = provider
@@ -170,7 +180,7 @@ export async function askAssistant(text, context = {}, { conversationId = defaul
   else if (provider === 'muse') response = await museResponse(text, context)
   else if (provider === 'muse-browser') {
     try {
-      response = await askMuseBrowser(museBrowserPrompt(text, context), { onSubmitted })
+      response = await askMuseBrowser(museBrowserPrompt(text, context), { onSubmitted, onPartial })
     } catch (error) {
       if (error.code !== 'MUSE_BROWSER_UNAVAILABLE') throw error
       console.warn('[assistant:muse-browser] unavailable before submission; falling back to Meta Model API')
